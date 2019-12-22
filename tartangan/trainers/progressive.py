@@ -2,14 +2,10 @@ import argparse
 import functools
 import os
 
-import numpy as np
 import torch
 from torch import nn
 import torch.utils.data as data_utils
 import torchvision
-from torchvision.datasets import VisionDataset
-from torchvision.datasets.folder import IMG_EXTENSIONS, pil_loader
-from torchvision.datasets.utils import list_files
 from torchvision import transforms
 import tqdm
 
