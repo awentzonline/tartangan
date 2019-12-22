@@ -44,6 +44,7 @@ class ProgressiveTrainer(Trainer):
 
     def train(self):
         os.makedirs(os.path.dirname(self.args.sample_file), exist_ok=True)
+        os.makedirs(os.path.dirname(self.args.checkpoint), exist_ok=True)
         self.build_models()
         self.update_dataset()
         self.progress_samples = self.sample_z(32)
@@ -56,6 +57,8 @@ class ProgressiveTrainer(Trainer):
                 steps += 1
                 if steps % self.args.gen_freq == 0:
                     self.output_samples(f'{self.args.sample_file}_{steps}.png')
+                if steps % self.args.checkpoint_freq == 0:
+                    self.save_checkpoint(f'{self.args.checkpoint}_{steps}')
                 if self.update_blend():
                     break
 
@@ -149,6 +152,8 @@ def main():
     p.add_argument('--sample-file', default='sample/tartangan')
     p.add_argument('--blend-steps', type=int, default=100)
     p.add_argument('--config', type=int, default=64)
+    p.add_argument('--checkpoint-freq', type=int, default=10000)
+    p.add_argument('--checkpoint', default='checkpoint/tartangan')
     args = p.parse_args()
     trainer = ProgressiveTrainer(args)
     trainer.train()

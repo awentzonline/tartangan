@@ -4,4 +4,6 @@ scraper_errors.json
 scraper_state.json
 sample/
 download/
+checkpoint/
 *.egg-info
+*.onnx

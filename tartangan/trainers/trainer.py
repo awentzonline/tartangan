@@ -30,6 +30,7 @@ class Trainer:
 
     def train(self):
         os.makedirs(os.path.dirname(self.args.sample_file), exist_ok=True)
+        os.makedirs(os.path.dirname(self.args.checkpoint), exist_ok=True)
         self.progress_samples = self.sample_z(32)
         self.build_models()
         transform = transforms.Compose([
@@ -49,6 +50,8 @@ class Trainer:
                 steps += 1
                 if steps % self.args.gen_freq == 0:
                     self.output_samples(f'{self.args.sample_file}_{steps}.png')
+                if steps % self.args.checkpoint_freq == 0:
+                    self.save_checkpoint(f'{self.args.checkpoint}_{steps}')
 
     def train_batch(self, imgs):
         # train discriminator
@@ -105,6 +108,18 @@ class Trainer:
             imgs = self.g(self.progress_samples)
         torchvision.utils.save_image(imgs, filename)
 
+    def save_checkpoint(self, filename):
+        g_filename = f'{filename}_g.pt'
+        d_filename = f'{filename}_d.pt'
+        torch.save(self.g, g_filename)
+        torch.save(self.d, d_filename)
+
+    def load_checkpoint(self, filename):
+        g_filename = f'{filename}_g.pt'
+        d_filename = f'{filename}_d.pt'
+        self.g = torch.load(g_filename)
+        self.d = torch.load(d_filename)
+
     @property
     def device(self):
         return self.args.device
@@ -144,6 +159,8 @@ if __name__ == '__main__':
     p.add_argument('--base-size', type=int, default=4)
     p.add_argument('--base-dims', type=int, default=32)
     p.add_argument('--sample-file', default='sample/tartangan')
+    p.add_argument('--checkpoint-freq', type=int, default=10000)
+    p.add_argument('--checkpoint', default='checkpoint/tartangan')
     args = p.parse_args()
     trainer = CNNTrainer(args)
     trainer.train()
