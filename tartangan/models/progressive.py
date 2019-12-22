@@ -23,8 +23,10 @@ class ProgressiveGenerator(nn.Module):
         self.output_channels = output_channels
         base_img_dims = self.base_size ** 2 * config.latent_dims
         self.base_img = nn.Sequential(
-            nn.Linear(config.latent_dims, base_img_dims),
+            nn.utils.spectral_norm(
+                nn.Linear(config.latent_dims, base_img_dims)),
             nn.ReLU(),
+            nn.BatchNorm1d(base_img_dims),
         )
         map(nn.init.orthogonal_, self.base_img.parameters())
         self.blocks = nn.ModuleList()
