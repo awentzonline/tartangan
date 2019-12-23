@@ -75,7 +75,7 @@ class ProgressiveGenerator(nn.Module):
             # get the first N-1 output
             feats_head = reduce(lambda feats, b: b(feats), ms_head, base_img)
             feats_tail = m_tail(feats_head)
-            feats_head = F.interpolate(feats_head, scale_factor=2, mode='bilinear')
+            feats_head = F.interpolate(feats_head, scale_factor=2, mode='bilinear', align_corners=True)
             head_out = self.prev_to_output(feats_head)
             tail_out = self.to_output(feats_tail)
             out = blend * head_out + (1 - blend) * tail_out
@@ -115,7 +115,7 @@ class ProgressiveGeneratorBlock(nn.Module):
             nn.BatchNorm2d(out_dims),
         ]
         if upsample:
-            layers.insert(0, Interpolate(scale_factor=2, mode='bilinear'))
+            layers.insert(0, Interpolate(scale_factor=2, mode='bilinear', align_corners=True))
         self.convs = nn.Sequential(*layers)
         map(nn.init.orthogonal_, self.parameters())
 
@@ -188,7 +188,7 @@ class ProgressiveDiscriminator(nn.Module):
             m_tail = self.blocks[-1]
             # get the first N-1 output
             feats_head = reduce(lambda feats, b: b(feats), ms_head, img)
-            feats_head = F.interpolate(feats_head, scale_factor=2, mode='bilinear')
+            feats_head = F.interpolate(feats_head, scale_factor=2, mode='bilinear', align_corners=True)
             head_out = self.prev_to_output(feats_head)
             # then the new Nth output
             feats_tail = m_tail(feats_head)

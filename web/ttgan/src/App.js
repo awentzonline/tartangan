@@ -14,14 +14,6 @@ class App extends React.Component {
           </p>
           <GANImage modelSrc="ttgan.onnx" />
           <GANControls />
-          <a
-            className="App-link"
-            href="https://awentzonline.github.io/tartangan"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            TartanGAN
-          </a>
         </header>
       </div>
     );
