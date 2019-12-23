@@ -31,9 +31,11 @@ class GANImage extends React.Component {
     });
     let scaledPixels = imgBatch.data.map(x => x * 255)
     const bytes = new Uint8ClampedArray(scaledPixels);
-    console.log(bytes)
-  //  const imageData = new ImageData(bytes, width, height);
-  //  ctx.putImageData(imageData, 0, 0);
+    // HACK: not sure how to add a dimension to the ONNX tensor so
+    // I'm doing this to add an alpha channel instead of
+    // simply dumping the bytes into ImageData into canvas context.
+    // const imageData = new ImageData(bytes, width, height);
+    // ctx.putImageData(imageData, 0, 0);
     const ctx = this.refs.canvas.getContext('2d');
     ctx.fillStyle = '#ffffff'; // implicit alpha of 1
     ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
