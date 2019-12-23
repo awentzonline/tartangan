@@ -36,11 +36,11 @@ def remove_all_spectral_norm(item):
 def main():
     p = argparse.ArgumentParser()
     p.add_argument('checkpoint')
-    p.add_argument('--output', default='ttgna.onnx')
+    p.add_argument('--output', default='ttgan.onnx')
     p.add_argument('--batch-size', default=1, type=int)
     args = p.parse_args()
 
-    generator = torch.load(args.checkpoint)
+    generator = torch.load(args.checkpoint, map_location='cpu')
     package_for_web(generator, args.output)
 
 

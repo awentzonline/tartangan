@@ -7,3 +7,4 @@ download/
 checkpoint/
 *.egg-info
 *.onnx
+*.pt
