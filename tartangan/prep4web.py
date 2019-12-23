@@ -26,7 +26,7 @@ def package_for_web(model, filename, batch_size=1, opset_version=7):
     dummy_input = torch.randn(batch_size, model.config.latent_dims)
     torch.onnx.export(
         model, dummy_input, filename, verbose=True,
-        opset_version=opset_version
+        opset_version=opset_version,
     )
 
 

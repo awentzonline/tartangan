@@ -10,6 +10,7 @@ from torchvision import transforms
 import tqdm
 
 from tartangan.image_dataset import JustImagesDataset
+from tartangan.models.losses import discriminator_hinge_loss, generator_hinge_loss
 from tartangan.models.progressive import (
     ProgressiveGenerator, ProgressiveDiscriminator, GAN_CONFIGS
 )
@@ -26,7 +27,7 @@ class ProgressiveTrainer(Trainer):
         self.g = ProgressiveGenerator(
             gan_config, optimizer_factory=g_optimizer_factory
         ).to(self.device)
-        # disciminator
+        # discriminator
         d_optimizer_factory = functools.partial(
             torch.optim.Adam, lr=self.args.lr_d
         )
@@ -35,7 +36,8 @@ class ProgressiveTrainer(Trainer):
         ).to(self.device)
         print(self.g)
         print(self.d)
-        self.d_loss = nn.BCELoss()
+        self.d_loss = discriminator_hinge_loss
+        self.g_loss = generator_hinge_loss
         self.gan_config = gan_config
         # blending
         self.block_blend = 0
@@ -82,7 +84,10 @@ class ProgressiveTrainer(Trainer):
             self.d.zero_grad()
             batch_imgs, labels = self.make_adversarial_batch(imgs, blend=self.block_blend)
             p_labels = self.d(batch_imgs)
-            d_loss = self.d_loss(p_labels, labels)
+            p_real_labels = p_labels[:len(p_labels) // 2]
+            p_fake_labels = p_labels[len(p_labels) // 2:]
+            d_real_loss, d_fake_loss = self.d_loss(p_real_labels, p_fake_labels)
+            d_loss = d_real_loss + d_fake_loss
             d_loss.backward()
             self.d.step_optimizers()
         # train generator
@@ -92,14 +97,16 @@ class ProgressiveTrainer(Trainer):
         batch_imgs, labels = self.make_generator_batch(imgs, blend=self.block_blend)
         #torchvision.utils.save_image(imgs, 'batch.png')
         p_labels = self.d(batch_imgs)
-        g_loss = self.d_loss(p_labels, labels)
+        g_loss = self.g_loss(p_labels)
         g_loss.backward()
         # gs = [[p.grad.mean() for p in b.parameters()] for b in self.g.blocks]
         # print(gs)
         self.g.step_optimizers()
 
         return dict(
-            g_loss=float(g_loss), d_loss=float(d_loss), blend=self.block_blend
+            g_loss=float(g_loss), d_loss=float(d_loss),
+            blend=self.block_blend,
+            real_loss=float(d_real_loss), fake_loss=float(d_fake_loss)
         )
 
     def output_samples(self, filename, n=None):
@@ -142,8 +149,8 @@ def main():
     p.add_argument('--batch-size', type=int, default=128)
     p.add_argument('--gen-freq', type=int, default=200)
     p.add_argument('--latent-dims', type=int, default=50)
-    p.add_argument('--lr-g', type=float, default=0.003)
-    p.add_argument('--lr-d', type=float, default=0.003)
+    p.add_argument('--lr-g', type=float, default=5e-5)
+    p.add_argument('--lr-d', type=float, default=2e-4)
     p.add_argument('--iters-d', type=int, default=2)
     p.add_argument('--device', default='cpu')
     p.add_argument('--epochs', type=int, default=10000)

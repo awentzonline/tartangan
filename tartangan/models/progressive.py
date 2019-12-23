@@ -6,7 +6,9 @@ import numpy as np
 import torch
 from torch import nn
 import torch.nn.functional as F
-
+from .blocks import (
+    DiscriminatorBlock, GeneratorBlock, ResidualGeneratorBlock
+)
 
 ProgressiveConfig = namedtuple('ProgressiveConfig', 'latent_dims blocks')
 
@@ -14,7 +16,7 @@ ProgressiveConfig = namedtuple('ProgressiveConfig', 'latent_dims blocks')
 class ProgressiveGenerator(nn.Module):
     def __init__(
         self, config, output_channels=3, optimizer_factory=torch.optim.Adam,
-        base_size=4, device='cpu'
+        base_size=4, device='cpu', block_class=ResidualGeneratorBlock
     ):
         super().__init__()
         self.config = config
@@ -25,11 +27,12 @@ class ProgressiveGenerator(nn.Module):
         self.base_img = nn.Sequential(
             nn.utils.spectral_norm(
                 nn.Linear(config.latent_dims, base_img_dims)),
-            nn.ReLU(),
             nn.BatchNorm1d(base_img_dims),
+            nn.ReLU(),
         )
         map(nn.init.orthogonal_, self.base_img.parameters())
         self.blocks = nn.ModuleList()
+        self.block_class = block_class
         self.optimizer_factory = optimizer_factory
         self.optimizers = [
             self.optimizer_factory(self.base_img.parameters())
@@ -45,7 +48,7 @@ class ProgressiveGenerator(nn.Module):
             return False
         in_dims, out_dims = self.config.blocks[self.top_index:self.top_index + 2]
         first_block = self.top_index == 0
-        new_block = ProgressiveGeneratorBlock(in_dims, out_dims, upsample=not first_block).to(self.device)
+        new_block = self.block_class(in_dims, out_dims, upsample=not first_block).to(self.device)
         self.top_index += 1
         self.blocks.append(new_block)
         # add an output mapping
@@ -101,28 +104,6 @@ class ProgressiveGenerator(nn.Module):
         return super().to(device, *args, **kwargs)
 
 
-class ProgressiveGeneratorBlock(nn.Module):
-    def __init__(self, in_dims, out_dims, upsample=True):
-        super().__init__()
-        layers = [
-            nn.utils.spectral_norm(
-                nn.Conv2d(in_dims, out_dims, 3, padding=1, bias=False)),
-            nn.ReLU(True),
-            nn.BatchNorm2d(out_dims),
-            nn.utils.spectral_norm(
-                nn.Conv2d(out_dims, out_dims, 3, padding=1, bias=False)),
-            nn.ReLU(True),
-            nn.BatchNorm2d(out_dims),
-        ]
-        if upsample:
-            layers.insert(0, Interpolate(scale_factor=2, mode='bilinear', align_corners=True))
-        self.convs = nn.Sequential(*layers)
-        map(nn.init.orthogonal_, self.parameters())
-
-    def forward(self, x):
-        return self.convs(x)
-
-
 class ProgressiveGeneratorOutput(nn.Module):
     def __init__(self, in_dims, out_dims):
         super().__init__()
@@ -136,12 +117,13 @@ class ProgressiveGeneratorOutput(nn.Module):
     def forward(self, x):
         return self.convs(x)
 
-# Disciminators
+# Discriminators
 
 class ProgressiveDiscriminator(nn.Module):
     def __init__(
         self, config, input_channels=3, output_channels=1,
-        optimizer_factory=torch.optim.Adam, device='cpu'
+        optimizer_factory=torch.optim.Adam, device='cpu',
+        block_class=DiscriminatorBlock
     ):
         super().__init__()
         self.config = config
@@ -149,6 +131,7 @@ class ProgressiveDiscriminator(nn.Module):
         self.input_channels = input_channels
         self.output_channels = output_channels
         self.blocks = nn.ModuleList()
+        self.block_class = block_class
         self.optimizer_factory = optimizer_factory
         self.optimizers = []  # per-block...maybe this is nuts?
         self.to_output = None#ProgressiveGeneratorOutput(base_dims, output_channels)
@@ -164,7 +147,7 @@ class ProgressiveDiscriminator(nn.Module):
         in_dims, out_dims = d_config_blocks[self.top_index:self.top_index + 2]
         first_conv = self.input_channels if self.top_index == 0 else 0
         self.top_index += 1
-        new_block = ProgressiveDiscriminatorBlock(in_dims, out_dims, first_conv).to(self.device)
+        new_block = DiscriminatorBlock(in_dims, out_dims, first_conv).to(self.device)
         self.blocks.append(new_block)
         # add an output mapping
         self.prev_to_output = self.to_output
@@ -182,13 +165,13 @@ class ProgressiveDiscriminator(nn.Module):
     def forward(self, img, blend=0):
         if blend > 0:
             # get features up to the penultimate layer, and then the final one
-            # upsample the penultimate features and blend them with the
-            # new, last layer
+            # upsample the penultimate features and blend them with the last layer
             ms_head = self.blocks[:-1]
             m_tail = self.blocks[-1]
             # get the first N-1 output
             feats_head = reduce(lambda feats, b: b(feats), ms_head, img)
-            feats_head = F.interpolate(feats_head, scale_factor=2, mode='bilinear', align_corners=True)
+            feats_head = F.interpolate(
+                feats_head, scale_factor=2, mode='bilinear', align_corners=True)
             head_out = self.prev_to_output(feats_head)
             # then the new Nth output
             feats_tail = m_tail(feats_head)
@@ -212,55 +195,19 @@ class ProgressiveDiscriminator(nn.Module):
         return super().to(device, *args, **kwargs)
 
 
-class ProgressiveDiscriminatorBlock(nn.Module):
-    def __init__(self, in_dims, out_dims, first_conv=None):
-        super().__init__()
-        layers = [
-            nn.utils.spectral_norm(
-                nn.Conv2d(in_dims, out_dims, 3, padding=1, bias=False)),
-            nn.LeakyReLU(0.2, inplace=True),
-            nn.BatchNorm2d(out_dims),
-            nn.utils.spectral_norm(
-                nn.Conv2d(out_dims, out_dims, 3, padding=1, bias=False)),
-            nn.LeakyReLU(0.2, inplace=True),
-            nn.BatchNorm2d(out_dims),
-            Interpolate(scale_factor=0.5, mode='bilinear'),
-        ]
-        if first_conv:
-            layers = [
-                nn.utils.spectral_norm(
-                    nn.Conv2d(first_conv, in_dims, 1, bias=False)),
-                nn.ReLU()] + layers
-        self.convs = nn.Sequential(*layers)
-        map(nn.init.orthogonal_, self.parameters())
-
-    def forward(self, x):
-        return self.convs(x)
-
-
 class ProgressiveDiscriminatorOutput(nn.Module):
     def __init__(self, in_dims, out_dims):
         super().__init__()
         self.convs = nn.Sequential(
             nn.utils.spectral_norm(
                 nn.Conv2d(in_dims, out_dims, 1, padding=0, bias=False)),
-            nn.Sigmoid()
+            #nn.Tanh()#Sigmoid()
         )
         map(nn.init.orthogonal_, self.parameters())
 
     def forward(self, img):
         feats = self.convs(img)
         return F.avg_pool2d(feats, feats.size()[2:]).view(-1, 1)
-
-
-class Interpolate(nn.Module):
-    def __init__(self, *args, **kwargs):
-        super().__init__()
-        self.args = args
-        self.kwargs = kwargs
-
-    def forward(self, x):
-        return F.interpolate(x, *self.args, **self.kwargs)
 
 
 GAN_CONFIGS = {

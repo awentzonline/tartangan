@@ -12,7 +12,6 @@ import tqdm
 
 from tartangan.image_dataset import JustImagesDataset
 from tartangan.models.cnn import GeneratorCNN, DiscriminatorCNN
-from tartangan.models.nlp import GeneratorNLP, DiscriminatorNLP
 
 
 class Trainer:
@@ -20,13 +19,7 @@ class Trainer:
         self.args = args
 
     def build_models(self):
-        self.g = GeneratorNLP(self.args.latent_dims, self.args.img_size).to(self.device)
-        self.d = DiscriminatorNLP(self.args.img_size).to(self.device)
-        self.optimizer_g = torch.optim.Adam(self.g.parameters(), lr=self.args.lr_g)
-        self.optimizer_d = torch.optim.Adam(self.d.parameters(), lr=self.args.lr_d)
-        self.d_loss = nn.BCELoss()
-        print(self.g)
-        print(self.d)
+        pass
 
     def train(self):
         os.makedirs(os.path.dirname(self.args.sample_file), exist_ok=True)
@@ -162,5 +155,6 @@ if __name__ == '__main__':
     p.add_argument('--checkpoint-freq', type=int, default=10000)
     p.add_argument('--checkpoint', default='checkpoint/tartangan')
     args = p.parse_args()
+    
     trainer = CNNTrainer(args)
     trainer.train()
