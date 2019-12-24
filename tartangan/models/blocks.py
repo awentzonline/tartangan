@@ -181,8 +181,8 @@ class IQNDiscriminatorOutput(nn.Module):
         p_target_tau, taus = self.iqn(p_target)
         if targets is not None:
             loss = iqn_loss(p_target_tau, targets, taus)
-        p_target = p_target.reshape(self.iqn.num_quantiles, -1, 1)
-        p_target = p_target.mean(0)
+        p_target_tau = p_target_tau.reshape(self.iqn.num_quantiles, -1, 1)
+        p_target = p_target_tau.mean(0)
         if targets is not None:
             return p_target, loss
         return p_target
