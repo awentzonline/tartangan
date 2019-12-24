@@ -7,7 +7,8 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 from .blocks import (
-    DiscriminatorBlock, GeneratorBlock, ResidualGeneratorBlock
+    DiscriminatorBlock, DiscriminatorOutput,
+    GeneratorBlock, GeneratorOutput, ResidualGeneratorBlock
 )
 
 ProgressiveConfig = namedtuple('ProgressiveConfig', 'latent_dims blocks')
@@ -16,7 +17,8 @@ ProgressiveConfig = namedtuple('ProgressiveConfig', 'latent_dims blocks')
 class ProgressiveGenerator(nn.Module):
     def __init__(
         self, config, output_channels=3, optimizer_factory=torch.optim.Adam,
-        base_size=4, device='cpu', block_class=ResidualGeneratorBlock
+        base_size=4, device='cpu', block_class=ResidualGeneratorBlock,
+        output_class=GeneratorOutput
     ):
         super().__init__()
         self.config = config
@@ -33,6 +35,7 @@ class ProgressiveGenerator(nn.Module):
         map(nn.init.orthogonal_, self.base_img.parameters())
         self.blocks = nn.ModuleList()
         self.block_class = block_class
+        self.output_class = output_class
         self.optimizer_factory = optimizer_factory
         self.optimizers = [
             self.optimizer_factory(self.base_img.parameters())
@@ -53,7 +56,7 @@ class ProgressiveGenerator(nn.Module):
         self.blocks.append(new_block)
         # add an output mapping
         self.prev_to_output = self.to_output
-        self.to_output = ProgressiveGeneratorOutput(
+        self.to_output = self.output_class(
             out_dims, self.output_channels
         ).to(self.device)
         # add an optimizer
@@ -78,7 +81,8 @@ class ProgressiveGenerator(nn.Module):
             # get the first N-1 output
             feats_head = reduce(lambda feats, b: b(feats), ms_head, base_img)
             feats_tail = m_tail(feats_head)
-            feats_head = F.interpolate(feats_head, scale_factor=2, mode='bilinear', align_corners=True)
+            feats_head = F.interpolate(
+                feats_head, scale_factor=2, mode='bilinear', align_corners=True)
             head_out = self.prev_to_output(feats_head)
             tail_out = self.to_output(feats_tail)
             out = blend * head_out + (1 - blend) * tail_out
@@ -104,26 +108,13 @@ class ProgressiveGenerator(nn.Module):
         return super().to(device, *args, **kwargs)
 
 
-class ProgressiveGeneratorOutput(nn.Module):
-    def __init__(self, in_dims, out_dims):
-        super().__init__()
-        self.convs = nn.Sequential(
-            nn.utils.spectral_norm(
-                nn.Conv2d(in_dims, out_dims, 1, padding=0, bias=False)),
-            nn.Sigmoid()
-        )
-        map(nn.init.orthogonal_, self.parameters())
-
-    def forward(self, x):
-        return self.convs(x)
-
 # Discriminators
 
 class ProgressiveDiscriminator(nn.Module):
     def __init__(
         self, config, input_channels=3, output_channels=1,
         optimizer_factory=torch.optim.Adam, device='cpu',
-        block_class=DiscriminatorBlock
+        block_class=DiscriminatorBlock, output_class=DiscriminatorOutput
     ):
         super().__init__()
         self.config = config
@@ -132,9 +123,10 @@ class ProgressiveDiscriminator(nn.Module):
         self.output_channels = output_channels
         self.blocks = nn.ModuleList()
         self.block_class = block_class
+        self.output_class = output_class
         self.optimizer_factory = optimizer_factory
         self.optimizers = []  # per-block...maybe this is nuts?
-        self.to_output = None#ProgressiveGeneratorOutput(base_dims, output_channels)
+        self.to_output = None#GeneratorOutput(base_dims, output_channels)
         self.prev_to_output = None
         self.top_index = 0
         self.add_block()
@@ -147,11 +139,11 @@ class ProgressiveDiscriminator(nn.Module):
         in_dims, out_dims = d_config_blocks[self.top_index:self.top_index + 2]
         first_conv = self.input_channels if self.top_index == 0 else 0
         self.top_index += 1
-        new_block = DiscriminatorBlock(in_dims, out_dims, first_conv).to(self.device)
+        new_block = self.block_class(in_dims, out_dims, first_conv).to(self.device)
         self.blocks.append(new_block)
         # add an output mapping
         self.prev_to_output = self.to_output
-        self.to_output = ProgressiveDiscriminatorOutput(
+        self.to_output = self.output_class(
             out_dims, self.output_channels
         ).to(self.device)
         block_parameters = chain(
@@ -195,19 +187,32 @@ class ProgressiveDiscriminator(nn.Module):
         return super().to(device, *args, **kwargs)
 
 
-class ProgressiveDiscriminatorOutput(nn.Module):
-    def __init__(self, in_dims, out_dims):
-        super().__init__()
-        self.convs = nn.Sequential(
-            nn.utils.spectral_norm(
-                nn.Conv2d(in_dims, out_dims, 1, padding=0, bias=False)),
-            #nn.Tanh()#Sigmoid()
-        )
-        map(nn.init.orthogonal_, self.parameters())
-
-    def forward(self, img):
-        feats = self.convs(img)
-        return F.avg_pool2d(feats, feats.size()[2:]).view(-1, 1)
+class ProgressiveIQNDiscriminator(ProgressiveDiscriminator):
+    def forward(self, img, blend=0, targets=None):
+        if blend > 0:
+            # get features up to the penultimate layer, and then the final one
+            # upsample the penultimate features and blend them with the last layer
+            ms_head = self.blocks[:-1]
+            m_tail = self.blocks[-1]
+            # get the first N-1 output
+            feats_head = reduce(lambda feats, b: b(feats), ms_head, img)
+            feats_head = F.interpolate(
+                feats_head, scale_factor=2, mode='bilinear', align_corners=True)
+            head_out = self.prev_to_output(feats_head)
+            # then the new Nth output
+            feats_tail = m_tail(feats_head)
+            tail_out = self.to_output(feats_tail, targets=targets)
+            if targets is not None:
+                tail_out, loss = tail_out
+            out = blend * head_out + (1 - blend) * tail_out
+        else:
+            feats = reduce(lambda feats, b: b(feats), self.blocks, img)
+            out = self.to_output(feats, targets=targets)
+            if targets is not None:
+                out, loss = out
+        if targets is not None:
+            return out, loss
+        return out
 
 
 GAN_CONFIGS = {

@@ -2,6 +2,8 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 
+from .iqn import IQN, iqn_loss
+
 
 class GeneratorBlock(nn.Module):
     def __init__(self, in_dims, out_dims, upsample=True):
@@ -76,7 +78,7 @@ class ResidualGeneratorBlock(nn.Module):
         if self.project_input:
             x = self.project_input(x)
         if self.upsample:
-            x = F.interpolate(x, scale_factor=2)
+            x = F.interpolate(x, scale_factor=2, mode='bilinear', align_corners=True)
         return x + h
 
 
@@ -130,6 +132,60 @@ class ResidualDiscriminatorBlock(nn.Module):
 
     def forward(self, x):
         return self.convs(x)
+
+
+class GeneratorOutput(nn.Module):
+    def __init__(self, in_dims, out_dims):
+        super().__init__()
+        self.convs = nn.Sequential(
+            nn.utils.spectral_norm(
+                nn.Conv2d(in_dims, out_dims, 1, padding=0, bias=False)),
+            nn.Sigmoid()
+        )
+        map(nn.init.orthogonal_, self.parameters())
+
+    def forward(self, x):
+        return self.convs(x)
+
+
+class DiscriminatorOutput(nn.Module):
+    def __init__(self, in_dims, out_dims):
+        super().__init__()
+        self.convs = nn.Sequential(
+            nn.utils.spectral_norm(
+                nn.Conv2d(in_dims, out_dims, 1, padding=0, bias=False)),
+            #nn.Tanh()#Sigmoid()
+        )
+        map(nn.init.orthogonal_, self.parameters())
+
+    def forward(self, img):
+        feats = self.convs(img)
+        return F.avg_pool2d(feats, feats.size()[2:]).view(-1, 1)
+
+
+class IQNDiscriminatorOutput(nn.Module):
+    def __init__(self, in_dims, out_dims):
+        super().__init__()
+        self.convs = nn.Sequential(
+            nn.utils.spectral_norm(
+                nn.Conv2d(in_dims, out_dims, 1, padding=0, bias=False)),
+            #nn.Tanh()#Sigmoid()
+        )
+        map(nn.init.orthogonal_, self.parameters())
+        # avoid ortho init for IQN
+        self.iqn = IQN(out_dims)
+
+    def forward(self, img, targets=None):
+        feats = self.convs(img)
+        p_target = F.avg_pool2d(feats, feats.size()[2:]).view(-1, 1)
+        p_target_tau, taus = self.iqn(p_target)
+        if targets is not None:
+            loss = iqn_loss(p_target_tau, targets, taus)
+        p_target = p_target.reshape(self.iqn.num_quantiles, -1, 1)
+        p_target = p_target.mean(0)
+        if targets is not None:
+            return p_target, loss
+        return p_target
 
 
 class Interpolate(nn.Module):
