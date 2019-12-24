@@ -117,16 +117,19 @@ class ResidualDiscriminatorBlock(nn.Module):
         ]
         self.no_skip = bool(first_conv)
         self.convs = nn.Sequential(*layers)
+        self.in_dims = in_dims
+        self.out_dims = out_dims
         self.project_input = None
         if in_dims != out_dims:
-            def project_input(x):
-                new_shape = list(x.shape)
-                new_shape[1] = out_dims
-                zs = torch.zeros(*new_shape).to(x.device)
-                zs[:, :in_dims] = x
-                return zs
-            self.project_input = project_input
+            self.project_input = self._project_input
         map(nn.init.orthogonal_, self.parameters())
+
+    def _project_input(self, x):
+        new_shape = list(x.shape)
+        new_shape[1] = self.out_dims
+        zs = torch.zeros(*new_shape).to(x.device)
+        zs[:, :self.in_dims] = x
+        return zs
 
     def forward(self, x):
         h = self.convs(x)
