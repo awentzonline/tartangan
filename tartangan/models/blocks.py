@@ -10,11 +10,11 @@ class GeneratorBlock(nn.Module):
         super().__init__()
         layers = [
             nn.utils.spectral_norm(
-                nn.Conv2d(in_dims, out_dims, 3, padding=1, bias=False)),
+                nn.Conv2d(in_dims, out_dims, 3, padding=1, bias=True)),
             nn.BatchNorm2d(out_dims),
             nn.ReLU(True),
             nn.utils.spectral_norm(
-                nn.Conv2d(out_dims, out_dims, 3, padding=1, bias=False)),
+                nn.Conv2d(out_dims, out_dims, 3, padding=1, bias=True)),
             nn.BatchNorm2d(out_dims),
             nn.ReLU(True),
         ]
@@ -32,11 +32,11 @@ class GeneratorBlock(nn.Module):
         super().__init__()
         layers = [
             nn.utils.spectral_norm(
-                nn.Conv2d(in_dims, out_dims, 3, padding=1, bias=False)),
+                nn.Conv2d(in_dims, out_dims, 3, padding=1, bias=True)),
             nn.BatchNorm2d(out_dims),
             nn.ReLU(True),
             nn.utils.spectral_norm(
-                nn.Conv2d(out_dims, out_dims, 3, padding=1, bias=False)),
+                nn.Conv2d(out_dims, out_dims, 3, padding=1, bias=True)),
             nn.BatchNorm2d(out_dims),
             nn.ReLU(True),
         ]
@@ -54,31 +54,29 @@ class ResidualGeneratorBlock(nn.Module):
         super().__init__()
         layers = [
             nn.utils.spectral_norm(
-                nn.Conv2d(in_dims, out_dims, 3, padding=1, bias=False)),
+                nn.Conv2d(in_dims, out_dims, 3, padding=1, bias=True)),
             nn.BatchNorm2d(out_dims),
             nn.ReLU(True),
             nn.utils.spectral_norm(
-                nn.Conv2d(out_dims, out_dims, 3, padding=1, bias=False)),
+                nn.Conv2d(out_dims, out_dims, 3, padding=1, bias=True)),
             nn.BatchNorm2d(out_dims),
             nn.ReLU(True),
         ]
         self.upsample = upsample
-        if upsample:
-            layers.insert(0, Interpolate(scale_factor=2, mode='bilinear', align_corners=True))
         self.project_input = None
         if in_dims != out_dims:
             self.project_input = nn.Sequential(
-                nn.utils.spectral_norm(nn.Conv2d(in_dims, out_dims, 1, bias=False)),
+                nn.utils.spectral_norm(nn.Conv2d(in_dims, out_dims, 1)),
             )
         self.convs = nn.Sequential(*layers)
         map(nn.init.orthogonal_, self.parameters())
 
     def forward(self, x):
-        h = self.convs(x)
-        if self.project_input:
-            x = self.project_input(x)
         if self.upsample:
             x = F.interpolate(x, scale_factor=2, mode='bilinear', align_corners=True)
+        h = self.convs(x)
+        if self.project_input is not None:
+            x = self.project_input(x)
         return x + h
 
 
@@ -87,11 +85,11 @@ class DiscriminatorBlock(nn.Module):
         super().__init__()
         layers = [
             nn.utils.spectral_norm(
-                nn.Conv2d(in_dims, out_dims, 3, padding=1, bias=False)),
+                nn.Conv2d(in_dims, out_dims, 3, padding=1, bias=True)),
             nn.BatchNorm2d(out_dims),
             nn.LeakyReLU(0.2, inplace=True),
             nn.utils.spectral_norm(
-                nn.Conv2d(out_dims, out_dims, 3, padding=1, bias=False)),
+                nn.Conv2d(out_dims, out_dims, 3, padding=1, bias=True)),
             nn.BatchNorm2d(out_dims),
             nn.LeakyReLU(0.2, inplace=True),
             Interpolate(scale_factor=0.5, mode='bilinear'),
@@ -99,7 +97,7 @@ class DiscriminatorBlock(nn.Module):
         if first_conv:
             layers = [
                 nn.utils.spectral_norm(
-                    nn.Conv2d(first_conv, in_dims, 1, bias=False)),
+                    nn.Conv2d(first_conv, in_dims, 1, bias=True)),
                 nn.ReLU()] + layers
         self.convs = nn.Sequential(*layers)
         map(nn.init.orthogonal_, self.parameters())
@@ -113,11 +111,11 @@ class ResidualDiscriminatorBlock(nn.Module):
         super().__init__()
         layers = [
             nn.utils.spectral_norm(
-                nn.Conv2d(in_dims, out_dims, 3, padding=1, bias=False)),
+                nn.Conv2d(in_dims, out_dims, 3, padding=1, bias=True)),
             nn.BatchNorm2d(out_dims),
             nn.LeakyReLU(0.2, inplace=True),
             nn.utils.spectral_norm(
-                nn.Conv2d(out_dims, out_dims, 3, padding=1, bias=False)),
+                nn.Conv2d(out_dims, out_dims, 3, padding=1, bias=True)),
             nn.BatchNorm2d(out_dims),
             nn.LeakyReLU(0.2, inplace=True),
             Interpolate(scale_factor=0.5, mode='bilinear'),
@@ -125,7 +123,7 @@ class ResidualDiscriminatorBlock(nn.Module):
         if first_conv:
             layers = [
                 nn.utils.spectral_norm(
-                    nn.Conv2d(first_conv, in_dims, 1, bias=False)),
+                    nn.Conv2d(first_conv, in_dims, 1, bias=True)),
                 nn.ReLU()] + layers
         self.convs = nn.Sequential(*layers)
         map(nn.init.orthogonal_, self.parameters())
@@ -139,7 +137,7 @@ class GeneratorOutput(nn.Module):
         super().__init__()
         self.convs = nn.Sequential(
             nn.utils.spectral_norm(
-                nn.Conv2d(in_dims, out_dims, 1, padding=0, bias=False)),
+                nn.Conv2d(in_dims, out_dims, 1, padding=0, bias=True)),
             nn.Sigmoid()
         )
         map(nn.init.orthogonal_, self.parameters())
@@ -153,7 +151,7 @@ class DiscriminatorOutput(nn.Module):
         super().__init__()
         self.convs = nn.Sequential(
             nn.utils.spectral_norm(
-                nn.Conv2d(in_dims, out_dims, 1, padding=0, bias=False)),
+                nn.Conv2d(in_dims, out_dims, 1, padding=0, bias=True)),
             #nn.Tanh()#Sigmoid()
         )
         map(nn.init.orthogonal_, self.parameters())
@@ -168,7 +166,7 @@ class IQNDiscriminatorOutput(nn.Module):
         super().__init__()
         self.convs = nn.Sequential(
             nn.utils.spectral_norm(
-                nn.Conv2d(in_dims, out_dims, 1, padding=0, bias=False)),
+                nn.Conv2d(in_dims, out_dims, 1, padding=0, bias=True)),
             #nn.Tanh()#Sigmoid()
         )
         map(nn.init.orthogonal_, self.parameters())

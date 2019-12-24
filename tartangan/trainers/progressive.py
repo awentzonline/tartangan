@@ -158,7 +158,7 @@ def main():
     p.add_argument('--base-dims', type=int, default=32)
     p.add_argument('--sample-file', default='sample/tartangan')
     p.add_argument('--blend-steps', type=int, default=100)
-    p.add_argument('--config', type=int, default=64)
+    p.add_argument('--config', default='64')
     p.add_argument('--checkpoint-freq', type=int, default=10000)
     p.add_argument('--checkpoint', default='checkpoint/tartangan')
     args = p.parse_args()

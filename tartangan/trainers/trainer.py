@@ -100,23 +100,25 @@ class Trainer:
         with torch.no_grad():
             imgs = self.g(self.progress_samples)
             torchvision.utils.save_image(imgs, filename)
-            if not hasattr(self, '_latent_grid_samples'):
-                self._latent_grid_samples = self.sample_latent_grid(5, 5)
-            grid_imgs = self.g(self._latent_grid_samples)
-            torchvision.utils.save_image(imgs, 'grid_imgs.png', ncols=5)
+            # if not hasattr(self, '_latent_grid_samples'):
+            #     self._latent_grid_samples = self.sample_latent_grid(5, 5)
+            # grid_imgs = self.g(self._latent_grid_samples)
+            # torchvision.utils.save_image(imgs, 'grid_imgs.png', nrow=5)
 
     def sample_latent_grid(self, rows, cols):
-        return torch.randn(rows * cols, self.latent_dims)
         a0, a1, b0, b1 = self.sample_z(4)
         left = a0, right = a1
         row_dz = b1 - b0
+        rows = []
         for row_i in range(rows):
-            row = left + np.linspace(0, 1, cols) * (right - left)
+            row = left + np.linspace(0, 1, cols).T * (right - left)
             print(row.shape)
             left += row_dz
             right += row_dz
+            rows.append(row)
+        grid = np.vstack(rows)
 
-        return grid
+        return
 
     def save_checkpoint(self, filename):
         g_filename = f'{filename}_g.pt'

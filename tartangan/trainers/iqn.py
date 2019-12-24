@@ -115,7 +115,7 @@ class ProgressiveIQNTrainer(Trainer):
             # if not hasattr(self, '_latent_grid_samples'):
             #     self._latent_grid_samples = self.sample_latent_grid(5, 5)
             # grid_imgs = self.g(self._latent_grid_samples, blend=self.block_blend)
-            # torchvision.utils.save_image(imgs, 'grid_imgs.png', ncols=5)
+            # torchvision.utils.save_image(imgs, 'grid_imgs.png', nrow=5)
 
     def sample_z(self, n=None):
         if n is None:
@@ -161,7 +161,7 @@ def main():
     p.add_argument('--base-dims', type=int, default=32)
     p.add_argument('--sample-file', default='sample/tartangan')
     p.add_argument('--blend-steps', type=int, default=100)
-    p.add_argument('--config', type=int, default=64)
+    p.add_argument('--config', default='64')
     p.add_argument('--checkpoint-freq', type=int, default=10000)
     p.add_argument('--checkpoint', default='checkpoint/tartangan')
     args = p.parse_args()

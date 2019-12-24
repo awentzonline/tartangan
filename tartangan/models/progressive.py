@@ -168,7 +168,7 @@ class ProgressiveDiscriminator(nn.Module):
             # then the new Nth output
             feats_tail = m_tail(feats_head)
             tail_out = self.to_output(feats_tail)
-            out = blend * head_out + (1 - blend) * tail_out
+            out = blend * head_out + (1. - blend) * tail_out
         else:
             feats = reduce(lambda feats, b: b(feats), self.blocks, img)
             out = self.to_output(feats)
@@ -216,7 +216,7 @@ class ProgressiveIQNDiscriminator(ProgressiveDiscriminator):
 
 
 GAN_CONFIGS = {
-    64: ProgressiveConfig(
+    '64': ProgressiveConfig(
         latent_dims=128,
         blocks=(
             128,  # 4,
@@ -226,7 +226,7 @@ GAN_CONFIGS = {
             16,  # 64,
         )
     ),
-    128: ProgressiveConfig(
+    '128': ProgressiveConfig(
         latent_dims=256,
         blocks=(
             256,  # 4,
@@ -237,7 +237,7 @@ GAN_CONFIGS = {
             16,  # 128
         )
     ),
-    256: ProgressiveConfig(
+    '256': ProgressiveConfig(
         latent_dims=256,
         blocks=(
             256,  # 4,
@@ -249,7 +249,7 @@ GAN_CONFIGS = {
             16   # 256
         )
     ),
-    512: ProgressiveConfig(
+    '512': ProgressiveConfig(
         latent_dims=512,
         blocks=(
             512,  # 4,
@@ -262,7 +262,7 @@ GAN_CONFIGS = {
             16,  # 512
         )
     ),
-    1024: ProgressiveConfig(
+    '1024': ProgressiveConfig(
         latent_dims=512,
         blocks=(
             512,  # 4,
@@ -275,5 +275,15 @@ GAN_CONFIGS = {
             32,  # 512
             16,  # 1024
         )
-    )
+    ),
+    'test': ProgressiveConfig(
+        latent_dims=64,
+        blocks=(
+            64,  # 4,
+            32,  # 8,
+            16,  # 16,
+            8,  # 32,
+            4,  # 64,
+        )
+    ),
 }
