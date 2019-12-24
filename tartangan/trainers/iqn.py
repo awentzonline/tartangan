@@ -112,10 +112,10 @@ class ProgressiveIQNTrainer(Trainer):
         with torch.no_grad():
             imgs = self.g(self.progress_samples, blend=self.block_blend)
             torchvision.utils.save_image(imgs, filename)
-            if not hasattr(self, '_latent_grid_samples'):
-                self._latent_grid_samples = self.sample_latent_grid(5, 5)
-            grid_imgs = self.g(self._latent_grid_samples, blend=self.block_blend)
-            torchvision.utils.save_image(imgs, 'grid_imgs.png', ncols=5)
+            # if not hasattr(self, '_latent_grid_samples'):
+            #     self._latent_grid_samples = self.sample_latent_grid(5, 5)
+            # grid_imgs = self.g(self._latent_grid_samples, blend=self.block_blend)
+            # torchvision.utils.save_image(imgs, 'grid_imgs.png', ncols=5)
 
     def sample_z(self, n=None):
         if n is None:
