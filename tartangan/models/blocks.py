@@ -117,6 +117,7 @@ class ResidualDiscriminatorBlock(nn.Module):
         ]
         self.no_skip = bool(first_conv)
         self.convs = nn.Sequential(*layers)
+        self.project_input = None
         if in_dims != out_dims:
             def project_input(x):
                 new_shape = list(x.shape)
