@@ -171,7 +171,7 @@ if __name__ == '__main__':
     p.add_argument('--base-size', type=int, default=4)
     p.add_argument('--base-dims', type=int, default=32)
     p.add_argument('--sample-file', default='sample/tartangan')
-    p.add_argument('--checkpoint-freq', type=int, default=10000)
+    p.add_argument('--checkpoint-freq', type=int, default=100000)
     p.add_argument('--checkpoint', default='checkpoint/tartangan')
     args = p.parse_args()
 

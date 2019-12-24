@@ -86,7 +86,7 @@ class ProgressiveIQNTrainer(Trainer):
         for d_i in range(self.args.iters_d):
             self.d.zero_grad()
             batch_imgs, labels = self.make_adversarial_batch(imgs, blend=self.block_blend)
-            p_labels, d_loss = self.d(batch_imgs, targets=labels)
+            p_labels, d_loss = self.d(batch_imgs, targets=labels, blend=self.block_blend)
             #d_loss = self.d_loss(p_labels, labels, taus)
             d_loss.backward()
             self.d.step_optimizers()
@@ -96,7 +96,7 @@ class ProgressiveIQNTrainer(Trainer):
         self.d.eval()
         batch_imgs, labels = self.make_generator_batch(imgs, blend=self.block_blend)
         #torchvision.utils.save_image(imgs, 'batch.png')
-        p_labels, g_loss = self.d(batch_imgs, targets=labels)
+        p_labels, g_loss = self.d(batch_imgs, targets=labels, blend=self.block_blend)
         g_loss.backward()
         # gs = [[p.grad.mean() for p in b.parameters()] for b in self.g.blocks]
         # print(gs)
@@ -156,7 +156,7 @@ def main():
     p.add_argument('--lr-d', type=float, default=2e-4)
     p.add_argument('--iters-d', type=int, default=2)
     p.add_argument('--device', default='cpu')
-    p.add_argument('--epochs', type=int, default=10000)
+    p.add_argument('--epochs', type=int, default=100000)
     p.add_argument('--base-size', type=int, default=4)
     p.add_argument('--base-dims', type=int, default=32)
     p.add_argument('--sample-file', default='sample/tartangan')

@@ -92,13 +92,8 @@ class DiscriminatorBlock(nn.Module):
                 nn.Conv2d(out_dims, out_dims, 3, padding=1, bias=True)),
             nn.BatchNorm2d(out_dims),
             nn.LeakyReLU(0.2, inplace=True),
-            Interpolate(scale_factor=0.5, mode='bilinear'),
+            Interpolate(scale_factor=0.5, mode='bilinear', align_corners=True),
         ]
-        if first_conv:
-            layers = [
-                nn.utils.spectral_norm(
-                    nn.Conv2d(first_conv, in_dims, 1, bias=True)),
-                nn.ReLU()] + layers
         self.convs = nn.Sequential(*layers)
         map(nn.init.orthogonal_, self.parameters())
 
@@ -118,18 +113,28 @@ class ResidualDiscriminatorBlock(nn.Module):
                 nn.Conv2d(out_dims, out_dims, 3, padding=1, bias=True)),
             nn.BatchNorm2d(out_dims),
             nn.LeakyReLU(0.2, inplace=True),
-            Interpolate(scale_factor=0.5, mode='bilinear'),
+            Interpolate(scale_factor=0.5, mode='bilinear', align_corners=True),
         ]
-        if first_conv:
-            layers = [
-                nn.utils.spectral_norm(
-                    nn.Conv2d(first_conv, in_dims, 1, bias=True)),
-                nn.ReLU()] + layers
+        self.no_skip = bool(first_conv)
         self.convs = nn.Sequential(*layers)
+        if in_dims != out_dims:
+            def project_input(x):
+                new_shape = list(x.shape)
+                new_shape[1] = out_dims
+                zs = torch.zeros(*new_shape).to(x.device)
+                zs[:, :in_dims] = x
+                return zs
+            self.project_input = project_input
         map(nn.init.orthogonal_, self.parameters())
 
     def forward(self, x):
-        return self.convs(x)
+        h = self.convs(x)
+        # if self.no_skip:
+        #     return h
+        x = F.interpolate(x, scale_factor=0.5, mode='bilinear', align_corners=True)
+        if self.project_input is not None:
+            x = self.project_input(x)
+        return x + h
 
 
 class GeneratorOutput(nn.Module):
@@ -144,6 +149,20 @@ class GeneratorOutput(nn.Module):
 
     def forward(self, x):
         return self.convs(x)
+
+
+class DiscriminatorInput(nn.Module):
+    def __init__(self, in_dims, out_dims):
+        super().__init__()
+        self.convs = nn.Sequential(
+            nn.utils.spectral_norm(
+                nn.Conv2d(in_dims, out_dims, 1, padding=0, bias=True)),
+                nn.ReLU(),
+        )
+        map(nn.init.orthogonal_, self.parameters())
+
+    def forward(self, img):
+        return self.convs(img)
 
 
 class DiscriminatorOutput(nn.Module):

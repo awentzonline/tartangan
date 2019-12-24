@@ -83,7 +83,7 @@ class ProgressiveTrainer(Trainer):
         for d_i in range(self.args.iters_d):
             self.d.zero_grad()
             batch_imgs, labels = self.make_adversarial_batch(imgs, blend=self.block_blend)
-            p_labels = self.d(batch_imgs)
+            p_labels = self.d(batch_imgs, blend=self.block_blend)
             p_real_labels = p_labels[:len(p_labels) // 2]
             p_fake_labels = p_labels[len(p_labels) // 2:]
             d_real_loss, d_fake_loss = self.d_loss(p_real_labels, p_fake_labels)
@@ -96,7 +96,7 @@ class ProgressiveTrainer(Trainer):
         self.d.eval()
         batch_imgs, labels = self.make_generator_batch(imgs, blend=self.block_blend)
         #torchvision.utils.save_image(imgs, 'batch.png')
-        p_labels = self.d(batch_imgs)
+        p_labels = self.d(batch_imgs, blend=self.block_blend)
         g_loss = self.g_loss(p_labels)
         g_loss.backward()
         # gs = [[p.grad.mean() for p in b.parameters()] for b in self.g.blocks]
@@ -159,7 +159,7 @@ def main():
     p.add_argument('--sample-file', default='sample/tartangan')
     p.add_argument('--blend-steps', type=int, default=100)
     p.add_argument('--config', default='64')
-    p.add_argument('--checkpoint-freq', type=int, default=10000)
+    p.add_argument('--checkpoint-freq', type=int, default=100000)
     p.add_argument('--checkpoint', default='checkpoint/tartangan')
     args = p.parse_args()
     trainer = ProgressiveTrainer(args)

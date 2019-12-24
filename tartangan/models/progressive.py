@@ -7,8 +7,9 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 from .blocks import (
-    DiscriminatorBlock, DiscriminatorOutput,
-    GeneratorBlock, GeneratorOutput, ResidualGeneratorBlock
+    DiscriminatorBlock, DiscriminatorOutput, DiscriminatorInput,
+    GeneratorBlock, GeneratorOutput,
+    ResidualDiscriminatorBlock, ResidualGeneratorBlock
 )
 
 ProgressiveConfig = namedtuple('ProgressiveConfig', 'latent_dims blocks')
@@ -114,7 +115,8 @@ class ProgressiveDiscriminator(nn.Module):
     def __init__(
         self, config, input_channels=3, output_channels=1,
         optimizer_factory=torch.optim.Adam, device='cpu',
-        block_class=DiscriminatorBlock, output_class=DiscriminatorOutput
+        block_class=ResidualDiscriminatorBlock, output_class=DiscriminatorOutput,
+        input_class=DiscriminatorInput
     ):
         super().__init__()
         self.config = config
@@ -123,31 +125,33 @@ class ProgressiveDiscriminator(nn.Module):
         self.output_channels = output_channels
         self.blocks = nn.ModuleList()
         self.block_class = block_class
+        self.input_class = input_class
         self.output_class = output_class
         self.optimizer_factory = optimizer_factory
         self.optimizers = []  # per-block...maybe this is nuts?
-        self.to_output = None#GeneratorOutput(base_dims, output_channels)
-        self.prev_to_output = None
+        self.from_input = None#GeneratorOutput(base_dims, output_channels)
+        self.prev_from_input = None
         self.top_index = 0
+        self.to_output = self.output_class(config.latent_dims, output_channels)
         self.add_block()
 
     def add_block(self):
         if self.top_index >= len(self.config.blocks) - 1:
             print('At highest block. Not adding.')
             return False
-        d_config_blocks = list(reversed(self.config.blocks))
-        in_dims, out_dims = d_config_blocks[self.top_index:self.top_index + 2]
+        d_config_blocks = self.config.blocks#list(reversed(self.config.blocks))
+        out_dims, in_dims = d_config_blocks[self.top_index:self.top_index + 2]
         first_conv = self.input_channels if self.top_index == 0 else 0
         self.top_index += 1
         new_block = self.block_class(in_dims, out_dims, first_conv).to(self.device)
-        self.blocks.append(new_block)
+        self.blocks.insert(0, new_block)
         # add an output mapping
-        self.prev_to_output = self.to_output
-        self.to_output = self.output_class(
-            out_dims, self.output_channels
+        self.prev_from_input = self.from_input
+        self.from_input = self.input_class(
+            self.input_channels, in_dims
         ).to(self.device)
         block_parameters = chain(
-            new_block.parameters(), self.to_output.parameters()
+            new_block.parameters(), self.from_input.parameters()
         )
         self.optimizers.append(
             self.optimizer_factory(block_parameters)
@@ -155,23 +159,23 @@ class ProgressiveDiscriminator(nn.Module):
         return True
 
     def forward(self, img, blend=0):
-        if blend > 0:
-            # get features up to the penultimate layer, and then the final one
-            # upsample the penultimate features and blend them with the last layer
-            ms_head = self.blocks[:-1]
-            m_tail = self.blocks[-1]
-            # get the first N-1 output
-            feats_head = reduce(lambda feats, b: b(feats), ms_head, img)
-            head_out = self.prev_to_output(feats_head)
-            head_out = F.interpolate(
-                head_out, scale_factor=2, mode='bilinear', align_corners=True)
-            # then the new Nth output
-            feats_tail = m_tail(feats_head)
-            tail_out = self.to_output(feats_tail)
-            out = blend * head_out + (1. - blend) * tail_out
+        """
+        blend == 0 means all tip o the network
+        blend == 1 means all penultimate layer
+        """
+        if blend > 0 and len(self.blocks) > 1:
+            feats_new = self.from_input(img)
+            newest_block = self.blocks[0]
+            feats_new = newest_block(feats_new)
+            img = F.interpolate(img, scale_factor=0.5, mode='bilinear', align_corners=True)
+            feats_last = self.prev_from_input(img)
+            blended_feats = blend * feats_last + (1. - blend) * feats_new
+            remaining_blocks = self.blocks[1:]
+            feats = reduce(lambda f, b: b(f), remaining_blocks, blended_feats)
         else:
-            feats = reduce(lambda feats, b: b(feats), self.blocks, img)
-            out = self.to_output(feats)
+            feats = self.from_input(img)
+            feats = reduce(lambda f, b: b(f), self.blocks, feats)
+        out = self.to_output(feats)
         return out
 
     def zero_grad(self):
@@ -197,8 +201,8 @@ class ProgressiveIQNDiscriminator(ProgressiveDiscriminator):
             # get the first N-1 output
             feats_head = reduce(lambda feats, b: b(feats), ms_head, img)
             head_out = self.prev_to_output(feats_head)
-            head_out = F.interpolate(
-                head_out, scale_factor=2, mode='bilinear', align_corners=True)
+            # head_out = F.interpolate(
+            #     head_out, scale_factor=0.5, mode='bilinear', align_corners=True)
             # then the new Nth output
             feats_tail = m_tail(feats_head)
             tail_out = self.to_output(feats_tail, targets=targets)
@@ -212,6 +216,26 @@ class ProgressiveIQNDiscriminator(ProgressiveDiscriminator):
                 out, loss = out
         if targets is not None:
             return out, loss
+        return out
+
+    def forward(self, img, blend=0, targets=None):
+        """
+        blend == 0 means all tip o the network
+        blend == 1 means all penultimate layer
+        """
+        if blend > 0 and len(self.blocks) > 1:
+            feats_new = self.from_input(img)
+            newest_block = self.blocks[0]
+            feats_new = newest_block(feats_new)
+            img = F.interpolate(img, scale_factor=0.5, mode='bilinear', align_corners=True)
+            feats_last = self.prev_from_input(img)
+            blended_feats = blend * feats_last + (1. - blend) * feats_new
+            remaining_blocks = self.blocks[1:]
+            feats = reduce(lambda f, b: b(f), remaining_blocks, blended_feats)
+        else:
+            feats = self.from_input(img)
+            feats = reduce(lambda f, b: b(f), self.blocks, feats)
+        out = self.to_output(feats, targets=targets)
         return out
 
 
@@ -284,6 +308,18 @@ GAN_CONFIGS = {
             16,  # 16,
             8,  # 32,
             4,  # 64,
+        )
+    ),
+    'test256': ProgressiveConfig(
+        latent_dims=256,
+        blocks=(
+            256,  # 4,
+            200,  # 8,
+            180,  # 16,
+            128,  # 32,
+            64,  # 64,
+            32,  # 128
+            16   # 256
         )
     ),
 }
