@@ -195,32 +195,6 @@ class ProgressiveDiscriminator(nn.Module):
 
 class ProgressiveIQNDiscriminator(ProgressiveDiscriminator):
     def forward(self, img, blend=0, targets=None):
-        if blend > 0:
-            # get features up to the penultimate layer, and then the final one
-            # upsample the penultimate features and blend them with the last layer
-            ms_head = self.blocks[:-1]
-            m_tail = self.blocks[-1]
-            # get the first N-1 output
-            feats_head = reduce(lambda feats, b: b(feats), ms_head, img)
-            head_out = self.prev_to_output(feats_head)
-            # head_out = F.interpolate(
-            #     head_out, scale_factor=0.5, mode='bilinear', align_corners=True)
-            # then the new Nth output
-            feats_tail = m_tail(feats_head)
-            tail_out = self.to_output(feats_tail, targets=targets)
-            if targets is not None:
-                tail_out, loss = tail_out
-            out = blend * head_out + (1 - blend) * tail_out
-        else:
-            feats = reduce(lambda feats, b: b(feats), self.blocks, img)
-            out = self.to_output(feats, targets=targets)
-            if targets is not None:
-                out, loss = out
-        if targets is not None:
-            return out, loss
-        return out
-
-    def forward(self, img, blend=0, targets=None):
         """
         blend == 0 means all tip o the network
         blend == 1 means all penultimate layer
