@@ -166,12 +166,15 @@ class ProgressiveDiscriminator(nn.Module):
         blend == 1 means all penultimate layer
         """
         if blend > 0 and len(self.blocks) > 1:
+            # get features from first layer
             feats_new = self.from_input(img)
             newest_block = self.blocks[0]
             feats_new = newest_block(feats_new)
+            # scale down the input and get features from the last input mapper
             img = F.interpolate(img, scale_factor=0.5, mode='bilinear', align_corners=True)
             feats_last = self.prev_from_input(img)
             blended_feats = blend * feats_last + (1. - blend) * feats_new
+            # apply remaining transformations to the blended features
             remaining_blocks = self.blocks[1:]
             feats = reduce(lambda f, b: b(f), remaining_blocks, blended_feats)
         else:
@@ -200,11 +203,14 @@ class ProgressiveIQNDiscriminator(ProgressiveDiscriminator):
         blend == 1 means all penultimate layer
         """
         if blend > 0 and len(self.blocks) > 1:
+            # get features from first layer
             feats_new = self.from_input(img)
             newest_block = self.blocks[0]
             feats_new = newest_block(feats_new)
+            # scale down the input and get features from the last input mapper
             img = F.interpolate(img, scale_factor=0.5, mode='bilinear', align_corners=True)
             feats_last = self.prev_from_input(img)
+            # apply remaining transformations to the blended features
             blended_feats = blend * feats_last + (1. - blend) * feats_new
             remaining_blocks = self.blocks[1:]
             feats = reduce(lambda f, b: b(f), remaining_blocks, blended_feats)
@@ -249,6 +255,31 @@ GAN_CONFIGS = {
             16   # 256
         )
     ),
+    '256thin': ProgressiveConfig(
+        latent_dims=128,
+        blocks=(
+            128,  # 4,
+            128,  # 8,
+            128,  # 16,
+            64,  # 32,
+            32,  # 64,
+            16,  # 128
+            8   # 256
+        )
+    ),
+    # Test the effects of shortcut projection to other n-filters
+    '256thin-test': ProgressiveConfig(
+        latent_dims=128,
+        blocks=(
+            128,  # 4,
+            120,  # 8,
+            100,  # 16,
+            64,  # 32,
+            32,  # 64,
+            16,  # 128
+            8   # 256
+        )
+    ),
     '512': ProgressiveConfig(
         latent_dims=512,
         blocks=(
@@ -260,6 +291,19 @@ GAN_CONFIGS = {
             64,  # 128
             32,  # 256
             16,  # 512
+        )
+    ),
+    '512thin': ProgressiveConfig(
+        latent_dims=256,
+        blocks=(
+            256,  # 4,
+            256,  # 8,
+            256,  # 16,
+            128,  # 32,
+            64,  # 64,
+            32,  # 128
+            16,  # 256
+            8,  # 512
         )
     ),
     '1024': ProgressiveConfig(

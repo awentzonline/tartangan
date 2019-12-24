@@ -60,7 +60,7 @@ class ResidualGeneratorBlock(nn.Module):
             nn.utils.spectral_norm(
                 nn.Conv2d(out_dims, out_dims, 3, padding=1, bias=True)),
             nn.BatchNorm2d(out_dims),
-            nn.ReLU(True),
+            #nn.ReLU(True),
         ]
         self.upsample = upsample
         self.project_input = None
@@ -77,7 +77,7 @@ class ResidualGeneratorBlock(nn.Module):
         h = self.convs(x)
         if self.project_input is not None:
             x = self.project_input(x)
-        return x + h
+        return F.relu(x + h)
 
 
 class DiscriminatorBlock(nn.Module):
@@ -112,7 +112,7 @@ class ResidualDiscriminatorBlock(nn.Module):
             nn.utils.spectral_norm(
                 nn.Conv2d(out_dims, out_dims, 3, padding=1, bias=True)),
             nn.BatchNorm2d(out_dims),
-            nn.LeakyReLU(0.2, inplace=True),
+            #nn.LeakyReLU(0.2, inplace=True),
             Interpolate(scale_factor=0.5, mode='bilinear', align_corners=True),
         ]
         self.no_skip = bool(first_conv)
@@ -138,7 +138,7 @@ class ResidualDiscriminatorBlock(nn.Module):
         x = F.interpolate(x, scale_factor=0.5, mode='bilinear', align_corners=True)
         if self.project_input is not None:
             x = self.project_input(x)
-        return x + h
+        return F.leaky_relu(x + h)
 
 
 class GeneratorOutput(nn.Module):
@@ -194,17 +194,17 @@ class IQNDiscriminatorOutput(nn.Module):
         )
         map(nn.init.orthogonal_, self.parameters())
         # avoid ortho init for IQN
-        feats_dims = 2 * 2
+        feats_dims = 2 * 2 * in_dims
         self.iqn = IQN(feats_dims)
 
-    def forward(self, img, targets=None):
-        feats = self.convs(img)
+    def forward(self, feats, targets=None):
         feats_shape = list(feats.shape)
         feats = feats.view(feats_shape[0], -1)
         feats_tau, taus = self.iqn(feats)
         feats_shape[0] = len(feats_tau)
         feats_tau = feats_tau.view(*feats_shape)
-        p_target_tau = F.avg_pool2d(feats_tau, feats_tau.size()[2:]).view(-1, 1)
+        feats = self.convs(feats_tau)
+        p_target_tau = F.avg_pool2d(feats, feats.size()[2:]).view(-1, 1)
         if targets is not None:
             loss = iqn_loss(p_target_tau, targets, taus)
         p_target_tau = p_target_tau.reshape(self.iqn.num_quantiles, -1, 1)
