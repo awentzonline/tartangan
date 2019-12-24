@@ -128,11 +128,13 @@ class ProgressiveDiscriminator(nn.Module):
         self.input_class = input_class
         self.output_class = output_class
         self.optimizer_factory = optimizer_factory
-        self.optimizers = []  # per-block...maybe this is nuts?
         self.from_input = None#GeneratorOutput(base_dims, output_channels)
         self.prev_from_input = None
         self.top_index = 0
         self.to_output = self.output_class(config.latent_dims, output_channels)
+        self.optimizers = [
+            self.optimizer_factory(self.to_output.parameters())
+        ]  # per-block...maybe this is nuts?
         self.add_block()
 
     def add_block(self):
