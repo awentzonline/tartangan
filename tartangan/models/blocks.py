@@ -68,7 +68,7 @@ class ResidualGeneratorBlock(nn.Module):
         self.project_input = None
         if in_dims != out_dims:
             self.project_input = nn.Sequential(
-                nn.utils.spectral_norm(nn.Linear(in_dims, out_dims)),
+                nn.utils.spectral_norm(nn.Conv2d(in_dims, out_dims, 1, bias=False)),
             )
         self.convs = nn.Sequential(*layers)
         map(nn.init.orthogonal_, self.parameters())
