@@ -8,7 +8,7 @@ class QuantileEmbedding(nn.Module):
         super().__init__()
         self.embedding_dims = embedding_dims
         self.hidden = nn.Sequential(
-            nn.Linear(state_dims, self.embedding_dims),
+            nn.Linear(self.embedding_dims, self.embedding_dims),
             nn.ReLU(),
         )
         self.to_state = nn.Sequential(
@@ -20,7 +20,7 @@ class QuantileEmbedding(nn.Module):
         )
 
     def forward(self, quantiles):
-        # qs = quantiles.repeat(1, self.embedding_dims)
+        quantiles = quantiles.repeat(1, self.embedding_dims)
         # qs = qs * np.pi * self.embedding_range
         # qs = torch.cos(qs)
         qs = self.hidden(quantiles)
@@ -28,12 +28,12 @@ class QuantileEmbedding(nn.Module):
 
 
 class IQN(nn.Module):
-    def __init__(self, feature_dims, quantile_dims=64, num_quantiles=8, mix='add'):
+    def __init__(self, feature_dims, quantile_dims=64, num_quantiles=8, mix='mult'):
         super().__init__()
         self.quantile_embedding = QuantileEmbedding(feature_dims, quantile_dims)
         self.feature_dims = feature_dims
         self.num_quantiles = num_quantiles
-        self.mix = 'add'
+        self.mix = mix
         self._device = None
 
     def forward(self, x):
@@ -53,7 +53,7 @@ class IQN(nn.Module):
     def sample_quantiles(self, n=1):
         if self._device is None:
             self._device = next(self.parameters()).device
-        return torch.rand(n * self.num_quantiles, self.feature_dims).to(self._device)
+        return torch.rand(n * self.num_quantiles, 1).to(self._device)
 
 
 def iqn_loss(preds, target, taus, k=1.):
@@ -67,7 +67,7 @@ def iqn_loss(preds, target, taus, k=1.):
     num_quantiles = preds.shape[0] // batch_size
     taus = torch.reshape(taus, (-1, batch_size, output_dims))
     preds = torch.reshape(preds, (-1, batch_size, output_dims))
-    target = target.repeat(num_quantiles, output_dims)
+    target = target.repeat(num_quantiles, 1)
     target = torch.reshape(target, (-1, batch_size, output_dims))
     err = target - preds
     loss = torch.where(
