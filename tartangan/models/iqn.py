@@ -9,6 +9,7 @@ class QuantileEmbedding(nn.Module):
         self.embedding_dims = embedding_dims
         self.hidden = nn.Sequential(
             nn.Linear(self.embedding_dims, self.embedding_dims),
+            nn.BatchNorm1d(self.embedding_dims),
             nn.ReLU(),
         )
         self.to_state = nn.Sequential(

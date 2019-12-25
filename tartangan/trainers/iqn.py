@@ -57,7 +57,7 @@ class ProgressiveIQNTrainer(Trainer):
         for epoch_i in range(self.args.epochs):
             loader_iter = tqdm.tqdm(self.train_loader)
             for batch_i, images in enumerate(loader_iter):
-                metrics = self.train_batch(images)
+                metrics = self.train_batch(images * 2 - 1)
                 loader_iter.set_postfix(**metrics)
                 steps += 1
                 if steps % self.args.gen_freq == 0:
@@ -74,7 +74,8 @@ class ProgressiveIQNTrainer(Trainer):
         ])
         self.dataset = JustImagesDataset(self.args.data_path, transform=transform)
         self.train_loader = data_utils.DataLoader(
-            self.dataset, batch_size=self.args.batch_size, shuffle=True
+            self.dataset, batch_size=self.args.batch_size, shuffle=True,
+            num_workers=self.args.workers
         )
 
     def train_batch(self, imgs):
@@ -111,7 +112,7 @@ class ProgressiveIQNTrainer(Trainer):
     def output_samples(self, filename, n=None):
         with torch.no_grad():
             imgs = self.g(self.progress_samples, blend=self.block_blend)
-            torchvision.utils.save_image(imgs, filename)
+            torchvision.utils.save_image(imgs, filename, range=(-1, 1), normalize=True)
             if not hasattr(self, '_latent_grid_samples'):
                 self._latent_grid_samples = self.sample_latent_grid(5, 5)
             grid_imgs = self.g(self._latent_grid_samples, blend=self.block_blend)
@@ -119,7 +120,7 @@ class ProgressiveIQNTrainer(Trainer):
                 grid_imgs, os.path.join(
                     os.path.dirname(filename), f'grid_{os.path.basename(filename)}'
                 ),
-                nrow=5
+                nrow=5, range=(-1, 1), normalize=True
             )
 
     def sample_z(self, n=None):
@@ -169,6 +170,7 @@ def main():
     p.add_argument('--config', default='64')
     p.add_argument('--checkpoint-freq', type=int, default=10000)
     p.add_argument('--checkpoint', default='checkpoint/tartangan')
+    p.add_argument('--workers', type=int, default=0)
     args = p.parse_args()
 
     trainer = ProgressiveIQNTrainer(args)

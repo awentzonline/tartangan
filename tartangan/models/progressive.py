@@ -1,4 +1,4 @@
-from collections import namedtuple
+from collections import deque, namedtuple
 from functools import reduce
 from itertools import chain
 
@@ -29,15 +29,17 @@ class ProgressiveGenerator(nn.Module):
         base_img_dims = self.base_size ** 2 * config.latent_dims
         self.base_img = nn.Sequential(
             nn.utils.spectral_norm(
-                nn.Linear(config.latent_dims, base_img_dims)),
-            nn.BatchNorm1d(base_img_dims),
+                nn.Linear(config.latent_dims, base_img_dims)
+            ),
             nn.ReLU(),
+            nn.BatchNorm1d(base_img_dims),
         )
         map(nn.init.orthogonal_, self.base_img.parameters())
         self.blocks = nn.ModuleList()
         self.block_class = block_class
         self.output_class = output_class
         self.optimizer_factory = optimizer_factory
+        self.output_optimizers = deque([], 2)
         self.optimizers = [
             self.optimizer_factory(self.base_img.parameters())
         ]  # per-block
@@ -61,11 +63,11 @@ class ProgressiveGenerator(nn.Module):
             out_dims, self.output_channels
         ).to(self.device)
         # add an optimizer
-        block_parameters = chain(
-            new_block.parameters(), self.to_output.parameters()
+        self.output_optimizers.append(
+            self.optimizer_factory(self.to_output.parameters())
         )
         self.optimizers.append(
-            self.optimizer_factory(block_parameters)
+            self.optimizer_factory(new_block.parameters())
         )
         return True
 
@@ -93,11 +95,11 @@ class ProgressiveGenerator(nn.Module):
         return out
 
     def zero_grad(self):
-        for o in self.optimizers:
+        for o in chain(self.optimizers, self.output_optimizers):
             o.zero_grad()
 
     def step_optimizers(self):
-        for o in self.optimizers:
+        for o in chain(self.optimizers, self.output_optimizers):
             o.step()
 
     @property
@@ -132,6 +134,7 @@ class ProgressiveDiscriminator(nn.Module):
         self.prev_from_input = None
         self.top_index = 0
         self.to_output = self.output_class(config.latent_dims, output_channels)
+        self.input_optimizers = deque([], 2)
         self.optimizers = [
             self.optimizer_factory(self.to_output.parameters())
         ]  # per-block...maybe this is nuts?
@@ -152,11 +155,11 @@ class ProgressiveDiscriminator(nn.Module):
         self.from_input = self.input_class(
             self.input_channels, in_dims
         ).to(self.device)
-        block_parameters = chain(
-            new_block.parameters(), self.from_input.parameters()
+        self.input_optimizers.append(
+            self.optimizer_factory(self.from_input.parameters())
         )
         self.optimizers.append(
-            self.optimizer_factory(block_parameters)
+            self.optimizer_factory(new_block.parameters())
         )
         return True
 
@@ -184,11 +187,11 @@ class ProgressiveDiscriminator(nn.Module):
         return out
 
     def zero_grad(self):
-        for o in self.optimizers:
+        for o in chain(self.optimizers, self.input_optimizers):
             o.zero_grad()
 
     def step_optimizers(self):
-        for o in self.optimizers:
+        for o in chain(self.optimizers, self.input_optimizers):
             o.step()
 
     def to(self, device, *args, **kwargs):
