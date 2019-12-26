@@ -2,6 +2,7 @@ import argparse
 import functools
 import os
 
+import numpy as np
 import torch
 from torch import nn
 import torch.utils.data as data_utils
@@ -16,10 +17,11 @@ from tartangan.models.losses import discriminator_hinge_loss, generator_hinge_lo
 from tartangan.models.progressive import (
     ProgressiveGenerator, ProgressiveIQNDiscriminator, GAN_CONFIGS
 )
+from .iqn import ProgressiveIQNTrainer
 from .trainer import Trainer
 
 
-class ProgressiveIQNTrainer(Trainer):
+class ProgressiveIQNShuffledTrainer(ProgressiveIQNTrainer):
     def build_models(self):
         gan_config = GAN_CONFIGS[self.args.config]
         # generator
@@ -35,7 +37,7 @@ class ProgressiveIQNTrainer(Trainer):
         )
         self.d = ProgressiveIQNDiscriminator(
             gan_config, optimizer_factory=d_optimizer_factory,
-            output_class=IQNDiscriminatorOutput
+            output_class=IQNDiscriminatorOutput, output_channels=2
         ).to(self.device)
         print(self.g)
         print(self.d)
@@ -46,37 +48,6 @@ class ProgressiveIQNTrainer(Trainer):
         self.block_blend = 0
         self.blend_steps_remaining = self.args.blend_steps
         self.in_blend_phase = False
-
-    def train(self):
-        os.makedirs(os.path.dirname(self.args.sample_file), exist_ok=True)
-        os.makedirs(os.path.dirname(self.args.checkpoint), exist_ok=True)
-        self.build_models()
-        self.update_dataset()
-        self.progress_samples = self.sample_z(32)
-        steps = 0
-        for epoch_i in range(self.args.epochs):
-            loader_iter = tqdm.tqdm(self.train_loader)
-            for batch_i, images in enumerate(loader_iter):
-                metrics = self.train_batch(images * 2 - 1)
-                loader_iter.set_postfix(**metrics)
-                steps += 1
-                if steps % self.args.gen_freq == 0:
-                    self.output_samples(f'{self.args.sample_file}_{steps}.png')
-                if steps % self.args.checkpoint_freq == 0:
-                    self.save_checkpoint(f'{self.args.checkpoint}_{steps}')
-                if self.update_blend():
-                    break
-
-    def update_dataset(self):
-        transform = transforms.Compose([
-            transforms.Resize((self.g.current_size, self.g.current_size)),
-            transforms.ToTensor()
-        ])
-        self.dataset = JustImagesDataset(self.args.data_path, transform=transform)
-        self.train_loader = data_utils.DataLoader(
-            self.dataset, batch_size=self.args.batch_size, shuffle=True,
-            num_workers=self.args.workers
-        )
 
     def train_batch(self, imgs):
         # train discriminator
@@ -109,47 +80,49 @@ class ProgressiveIQNTrainer(Trainer):
         #    real_loss=float(d_real_loss), fake_loss=float(d_fake_loss)
         )
 
-    def output_samples(self, filename, n=None):
-        with torch.no_grad():
-            imgs = self.g(self.progress_samples, blend=self.block_blend)
-            torchvision.utils.save_image(imgs, filename, range=(-1, 1), normalize=True)
-            if not hasattr(self, '_latent_grid_samples'):
-                self._latent_grid_samples = self.sample_latent_grid(5, 5)
-            grid_imgs = self.g(self._latent_grid_samples, blend=self.block_blend)
-            torchvision.utils.save_image(
-                grid_imgs, os.path.join(
-                    os.path.dirname(filename), f'grid_{os.path.basename(filename)}'
-                ),
-                nrow=5, range=(-1, 1), normalize=True
-            )
+    def shuffle_images(self, imgs, num_swaps=2, min_size=0.2, max_size=0.3):
+        """Swap chunks of these imgs around."""
+        num_imgs, c, h, w = imgs.shape
+        for i in range(num_swaps):
+            # choose size of swap windows
+            for j in range(num_imgs):
+                self.shuffle_img(
+                    imgs[j], num_swaps=num_swaps, min_size=min_size,
+                    max_size=max_size
+                )
+        return imgs
 
-    def sample_z(self, n=None):
-        if n is None:
-            n = self.args.batch_size
-        return torch.randn(n, self.gan_config.latent_dims).to(self.device)
+    def shuffle_img(self, img, num_swaps=2, min_size=0.2, max_size=0.3):
+        c, h, w = img.shape
+        ratio = np.random.uniform(min_size, max_size)
+        width = np.clip(ratio * w, 1, None).astype(np.int64)
+        height = np.clip(ratio * h, 1, None).astype(np.int64)
+        x0, x1 = np.random.uniform(0, w - width, 2).astype(np.int64)
+        y0, y1 = np.random.uniform(0, h - height, 2).astype(np.int64)
+        a0 = img[:, y0:y0 + height, x0:x0 + width]
+        a1 = img[:, y1:y1 + height, x0:x0 + width]
+        img[:, y0:y0 + height, x0:x0 + width] = a1
+        img[:, y1:y1 + height, x1:x1 + width] = a0
 
-    def update_blend(self):
-        self.blend_steps_remaining -= 1
-        # update blend weight
-        if self.in_blend_phase:
-            self.block_blend = self.blend_steps_remaining / self.args.blend_steps
-        else:
-            self.block_blend = 0
-        # flip states every `self.args.blend_steps`
-        if self.blend_steps_remaining <= 0:
-            self.in_blend_phase = not self.in_blend_phase
-            self.blend_steps_remaining = self.args.blend_steps
-            # potentially add a new block
-            if self.in_blend_phase:
-                print('Adding blocks')
-                if not self.g.add_block():
-                    return False
-                self.d.add_block()
-                print(self.g)
-                print(self.d)
-                self.update_dataset()
-                return True
-        return False
+    def make_adversarial_batch(self, real_data, **g_kwargs):
+        generated_data = self.sample_g(len(real_data), **g_kwargs)
+        batch = torch.cat([real_data, generated_data], dim=0)
+        labels = torch.zeros(len(batch), 2).to(self.device)
+        labels[:len(labels) // 2, 0] = 1  # first half is real
+        # shuffle
+        p_shuffle_img = 0.1
+        is_shuffled = torch.from_numpy(np.random.binomial(1, p_shuffle_img, len(batch)))
+        for i, shuffle in enumerate(is_shuffled):
+            if shuffle:
+                self.shuffle_img(batch[i])
+        labels[np.arange(len(labels)), 1] = is_shuffled.float().to(self.device)
+        return batch, labels
+
+    def make_generator_batch(self, real_data, **g_kwargs):
+        generated_data = self.sample_g(len(real_data) * 2, **g_kwargs)
+        labels = torch.ones(len(generated_data), 2).to(self.device)
+        labels[:, 1] = 0
+        return generated_data, labels
 
 
 def main():
@@ -173,7 +146,7 @@ def main():
     p.add_argument('--workers', type=int, default=0)
     args = p.parse_args()
 
-    trainer = ProgressiveIQNTrainer(args)
+    trainer = ProgressiveIQNShuffledTrainer(args)
     trainer.train()
 
 

@@ -182,6 +182,7 @@ class IQNDiscriminatorOutput(nn.Module):
         # avoid ortho init for IQN
         feats_dims = 2 * 2 * in_dims
         self.iqn = IQN(feats_dims)
+        self.out_dims = out_dims
 
     def forward(self, feats, targets=None):
         feats_shape = list(feats.shape)
@@ -190,8 +191,9 @@ class IQNDiscriminatorOutput(nn.Module):
         feats_shape[0] = len(feats_tau)
         feats_tau = feats_tau.view(*feats_shape)
         feats = self.convs(feats_tau)
-        p_target_tau = F.avg_pool2d(feats, feats.size()[2:]).view(-1, 1)
+        p_target_tau = F.avg_pool2d(feats, feats.size()[2:]).view(-1, self.out_dims)
         if targets is not None:
+            taus = taus.repeat(1, self.out_dims)
             loss = iqn_loss(p_target_tau, targets, taus)
         p_target_tau = p_target_tau.reshape(self.iqn.num_quantiles, -1, 1)
         p_target = p_target_tau.mean(0)

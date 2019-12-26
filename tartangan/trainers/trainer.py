@@ -111,15 +111,16 @@ class Trainer:
             )
 
     def sample_latent_grid(self, nrows, ncols):
-        a0, a1, b0, b1 = self.sample_z(4)
-        left, right = a0, a1
-        left_dz, right_dz = b0 - left, b1 - right
+        top_left, top_right, bottom_left, bottom_right = self.sample_z(4)
+        left_drow = (bottom_left - top_left) / nrows
+        right_drow = (bottom_right - top_right) / nrows
         rows = []
         weights = torch.linspace(0, 1, ncols)[None, ...].T.to(self.device)
+        left, right = top_left, top_right
         for row_i in range(nrows):
             row = left + weights * (right - left)
-            left += left_dz
-            right += right_dz
+            left += left_drow
+            right += right_drow
             rows.append(row)
         grid = torch.cat(rows, dim=0)
         return grid

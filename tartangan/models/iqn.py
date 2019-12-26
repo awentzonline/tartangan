@@ -9,11 +9,12 @@ class QuantileEmbedding(nn.Module):
         self.embedding_dims = embedding_dims
         self.hidden = nn.Sequential(
             nn.Linear(self.embedding_dims, self.embedding_dims),
-            nn.BatchNorm1d(self.embedding_dims),
             nn.ReLU(),
+            nn.BatchNorm1d(self.embedding_dims),
         )
         self.to_state = nn.Sequential(
             nn.Linear(self.embedding_dims, state_dims),
+            nn.BatchNorm1d(state_dims),
         )
         self.embedding_range = nn.Parameter(
             torch.arange(1, self.embedding_dims + 1).float(),
