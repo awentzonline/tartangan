@@ -65,6 +65,11 @@ class ProgressiveTrainer(Trainer):
                     break
 
     def update_dataset(self):
+        # possibly save for cache
+        if hasattr(self, 'dataset'):
+            if self.args.dataset_cache and self.g.current_size <= 16:
+                self.dataset.save_cache(self.dataset_cache_path)
+
         transform = transforms.Compose([
             transforms.Resize((self.g.current_size, self.g.current_size)),
             transforms.ToTensor()
@@ -73,6 +78,17 @@ class ProgressiveTrainer(Trainer):
         self.train_loader = data_utils.DataLoader(
             self.dataset, batch_size=self.args.batch_size, shuffle=True,
             num_workers=self.args.workers
+        )
+
+        if self.args.dataset_cache and self.g.current_size <= 16:
+            self.dataset.load_cache(self.dataset_cache_path)
+
+    @property
+    def dataset_cache_path(self):
+        root_hash = hashlib.md5(self.dataset.root.encode('utf-8')).hexdigest()
+        return self.args.dataset_cache.format(
+            root=root_hash,
+            size=self.g.current_size // 2
         )
 
     def train_batch(self, imgs):
@@ -100,7 +116,7 @@ class ProgressiveTrainer(Trainer):
         p_labels = self.d(batch_imgs, blend=self.block_blend)
         g_loss = self.g_loss(p_labels)
         g_loss.backward()
-        # gs = [[p.grad.mean() for p in b.parameters()] for b in self.g.blocks]
+        # gs = [[p.grad.mean() for p in b.parameters()] for b in (self.g.input_block,)]
         # print(gs)
         self.g.step_optimizers()
 
@@ -159,8 +175,8 @@ def main():
     p.add_argument('--batch-size', type=int, default=128)
     p.add_argument('--gen-freq', type=int, default=200)
     p.add_argument('--latent-dims', type=int, default=50)
-    p.add_argument('--lr-g', type=float, default=1e-4)
-    p.add_argument('--lr-d', type=float, default=4e-4)
+    p.add_argument('--lr-g', type=float, default=1e-3)
+    p.add_argument('--lr-d', type=float, default=4e-3)
     p.add_argument('--iters-d', type=int, default=1)
     p.add_argument('--device', default='cpu')
     p.add_argument('--epochs', type=int, default=10000)
@@ -172,6 +188,7 @@ def main():
     p.add_argument('--checkpoint-freq', type=int, default=100000)
     p.add_argument('--checkpoint', default='checkpoint/tartangan')
     p.add_argument('--workers', type=int, default=0)
+    p.add_argument('--dataset-cache', default='cache/cache_{size}.pkl')
     args = p.parse_args()
     trainer = ProgressiveTrainer(args)
     trainer.train()

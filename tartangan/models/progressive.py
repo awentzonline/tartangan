@@ -8,8 +8,9 @@ from torch import nn
 import torch.nn.functional as F
 from .blocks import (
     DiscriminatorBlock, DiscriminatorOutput, DiscriminatorInput,
-    GeneratorBlock, GeneratorOutput,
-    ResidualDiscriminatorBlock, ResidualGeneratorBlock
+    GeneratorBlock, GeneratorInputMLP, GeneratorOutput,
+    ResidualDiscriminatorBlock, ResidualGeneratorBlock,
+    TiledZGeneratorInput, WeightedComponents
 )
 
 ProgressiveConfig = namedtuple('ProgressiveConfig', 'latent_dims blocks')
@@ -19,30 +20,23 @@ class ProgressiveGenerator(nn.Module):
     def __init__(
         self, config, output_channels=3, optimizer_factory=torch.optim.Adam,
         base_size=4, device='cpu', block_class=ResidualGeneratorBlock,
-        output_class=GeneratorOutput
+        input_class=WeightedComponents, output_class=GeneratorOutput
     ):
         super().__init__()
         self.config = config
         self.device = device
         self.base_size = base_size
         self.output_channels = output_channels
-        base_img_dims = self.base_size ** 2 * config.latent_dims
-        self.base_img = nn.Sequential(
-            nn.utils.spectral_norm(
-                nn.Linear(config.latent_dims, base_img_dims)
-            ),
-            nn.ReLU(),
-            nn.BatchNorm1d(base_img_dims),
-        )
-        map(nn.init.orthogonal_, self.base_img.parameters())
+        self.input_block = input_class(config.latent_dims, size=base_size)
         self.blocks = nn.ModuleList()
         self.block_class = block_class
         self.output_class = output_class
         self.optimizer_factory = optimizer_factory
         self.output_optimizers = deque([], 2)
         self.optimizers = [
-            self.optimizer_factory(self.base_img.parameters())
+        #    self.optimizer_factory(self.input_block.parameters())
         ]  # per-block
+        map(nn.init.orthogonal_, self.input_block.parameters())
         self.to_output = None
         self.prev_to_output = None
         self.top_index = 0
@@ -72,7 +66,7 @@ class ProgressiveGenerator(nn.Module):
         return True
 
     def forward(self, z, blend=0):
-        base_img = self.base_img(z)
+        base_img = self.input_block(z)
         base_img = base_img.view(
             -1, self.config.latent_dims, self.base_size, self.base_size)
         if blend > 0:
@@ -118,7 +112,7 @@ class ProgressiveDiscriminator(nn.Module):
         self, config, input_channels=3, output_channels=1,
         optimizer_factory=torch.optim.Adam, device='cpu',
         block_class=ResidualDiscriminatorBlock, output_class=DiscriminatorOutput,
-        input_class=DiscriminatorInput
+        input_class=DiscriminatorInput, norm_factory=nn.BatchNorm2d
     ):
         super().__init__()
         self.config = config
@@ -130,6 +124,7 @@ class ProgressiveDiscriminator(nn.Module):
         self.input_class = input_class
         self.output_class = output_class
         self.optimizer_factory = optimizer_factory
+        self.norm_factory = norm_factory
         self.from_input = None#GeneratorOutput(base_dims, output_channels)
         self.prev_from_input = None
         self.top_index = 0

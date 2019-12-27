@@ -19,7 +19,7 @@ setup(
     entry_points={
         "console_scripts": [
             "tartangan_scrape = tartangan.scraper:main",
-            "tartangan_train = tartangan.trainers.progressive:main"
+            "tartangan_train = tartangan.trainers.iqn:main"
         ]
     },
     install_requires=[

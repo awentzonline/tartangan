@@ -3,6 +3,7 @@ __pycache__
 scraper_errors.json
 scraper_state.json
 sample/
+cache/
 download/
 checkpoint/
 *.egg-info

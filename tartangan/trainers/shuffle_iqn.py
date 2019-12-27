@@ -7,11 +7,12 @@ import torch
 from torch import nn
 import torch.utils.data as data_utils
 import torchvision
-from torchvision import transforms
 import tqdm
 
 from tartangan.image_dataset import JustImagesDataset
-from tartangan.models.blocks import IQNDiscriminatorOutput
+from tartangan.models.blocks import (
+    ResidualDiscriminatorBlock, ResidualGeneratorBlock, IQNDiscriminatorOutput
+)
 from tartangan.models.iqn import iqn_loss
 from tartangan.models.losses import discriminator_hinge_loss, generator_hinge_loss
 from tartangan.models.progressive import (
@@ -28,16 +29,24 @@ class ProgressiveIQNShuffledTrainer(ProgressiveIQNTrainer):
         g_optimizer_factory = functools.partial(
             torch.optim.Adam, lr=self.args.lr_g
         )
+        g_block_factory = functools.partial(
+            ResidualGeneratorBlock, norm_factory=nn.Identity#nn.BatchNorm2d
+        )
         self.g = ProgressiveGenerator(
-            gan_config, optimizer_factory=g_optimizer_factory
+            gan_config, optimizer_factory=g_optimizer_factory, block_class=g_block_factory
         ).to(self.device)
         # discriminator
         d_optimizer_factory = functools.partial(
             torch.optim.Adam, lr=self.args.lr_d
         )
+        d_block_factory = functools.partial(
+            ResidualDiscriminatorBlock, norm_factory=nn.Identity#nn.BatchNorm2d
+        )
         self.d = ProgressiveIQNDiscriminator(
             gan_config, optimizer_factory=d_optimizer_factory,
-            output_class=IQNDiscriminatorOutput, output_channels=2
+            output_class=IQNDiscriminatorOutput,
+            block_class=d_block_factory,
+            output_channels=2
         ).to(self.device)
         print(self.g)
         print(self.d)
@@ -59,7 +68,6 @@ class ProgressiveIQNShuffledTrainer(ProgressiveIQNTrainer):
             self.d.zero_grad()
             batch_imgs, labels = self.make_adversarial_batch(imgs, blend=self.block_blend)
             p_labels, d_loss = self.d(batch_imgs, targets=labels, blend=self.block_blend)
-            #d_loss = self.d_loss(p_labels, labels, taus)
             d_loss.backward()
             self.d.step_optimizers()
         # train generator
@@ -67,7 +75,7 @@ class ProgressiveIQNShuffledTrainer(ProgressiveIQNTrainer):
         self.g.train()
         self.d.eval()
         batch_imgs, labels = self.make_generator_batch(imgs, blend=self.block_blend)
-        #torchvision.utils.save_image(imgs, 'batch.png')
+        #torchvision.utils.save_image(imgs, 'batch.png', range=(-1, 1), normalize=True)
         p_labels, g_loss = self.d(batch_imgs, targets=labels, blend=self.block_blend)
         g_loss.backward()
         # gs = [[p.grad.mean() for p in b.parameters()] for b in self.g.blocks]
@@ -131,8 +139,8 @@ def main():
     p.add_argument('--batch-size', type=int, default=128)
     p.add_argument('--gen-freq', type=int, default=200)
     p.add_argument('--latent-dims', type=int, default=50)
-    p.add_argument('--lr-g', type=float, default=5e-5)
-    p.add_argument('--lr-d', type=float, default=2e-4)
+    p.add_argument('--lr-g', type=float, default=1e-3)
+    p.add_argument('--lr-d', type=float, default=4e-3)
     p.add_argument('--iters-d', type=int, default=1)
     p.add_argument('--device', default='cpu')
     p.add_argument('--epochs', type=int, default=100000)
@@ -144,6 +152,7 @@ def main():
     p.add_argument('--checkpoint-freq', type=int, default=10000)
     p.add_argument('--checkpoint', default='checkpoint/tartangan')
     p.add_argument('--workers', type=int, default=0)
+    p.add_argument('--dataset-cache', default='cache/cache_{size}.pkl')
     args = p.parse_args()
 
     trainer = ProgressiveIQNShuffledTrainer(args)

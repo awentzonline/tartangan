@@ -1,4 +1,5 @@
 import os
+import pickle
 
 from torchvision.datasets import VisionDataset
 from torchvision.datasets.folder import IMG_EXTENSIONS, pil_loader
@@ -23,6 +24,17 @@ class JustImagesDataset(VisionDataset):
 
     def __len__(self):
         return len(self.image_filenames)
+
+    def load_cache(self, filename):
+        if os.path.exists(filename):
+            with open(filename, 'rb') as infile:
+                self._image_cache = pickle.load(infile)
+
+    def save_cache(self, filename):
+        if os.path.dirname(filename):
+            os.makedirs(os.path.dirname(filename), exist_ok=True)
+        with open(filename, 'wb') as outfile:
+            pickle.dump(self._image_cache, outfile)
 
 
 def list_files_recursive(root, extensions):

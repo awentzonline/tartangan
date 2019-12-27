@@ -4,35 +4,32 @@ from torch import nn
 
 
 class QuantileEmbedding(nn.Module):
-    def __init__(self, state_dims, embedding_dims=64):
+    def __init__(self, state_dims, embedding_dims=64, norm_factory=nn.BatchNorm1d):
         super().__init__()
         self.embedding_dims = embedding_dims
         self.hidden = nn.Sequential(
             nn.Linear(self.embedding_dims, self.embedding_dims),
             nn.ReLU(),
-            nn.BatchNorm1d(self.embedding_dims),
+            norm_factory(self.embedding_dims),
         )
         self.to_state = nn.Sequential(
             nn.Linear(self.embedding_dims, state_dims),
-            nn.BatchNorm1d(state_dims),
-        )
-        self.embedding_range = nn.Parameter(
-            torch.arange(1, self.embedding_dims + 1).float(),
-            requires_grad=False
+            norm_factory(state_dims),
         )
 
     def forward(self, quantiles):
         quantiles = quantiles.repeat(1, self.embedding_dims)
-        # qs = qs * np.pi * self.embedding_range
-        # qs = torch.cos(qs)
         qs = self.hidden(quantiles)
         return self.to_state(qs)
 
 
 class IQN(nn.Module):
-    def __init__(self, feature_dims, quantile_dims=64, num_quantiles=8, mix='mult'):
+    def __init__(self, feature_dims, quantile_dims=64, num_quantiles=8, mix='mult',
+                 norm_factory=nn.BatchNorm1d):
         super().__init__()
-        self.quantile_embedding = QuantileEmbedding(feature_dims, quantile_dims)
+        self.quantile_embedding = QuantileEmbedding(
+            feature_dims, quantile_dims, norm_factory=norm_factory
+        )
         self.feature_dims = feature_dims
         self.num_quantiles = num_quantiles
         self.mix = mix

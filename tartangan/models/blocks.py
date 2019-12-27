@@ -6,19 +6,19 @@ from .iqn import IQN, iqn_loss
 
 
 class GeneratorBlock(nn.Module):
-    def __init__(self, in_dims, out_dims, upsample=True):
+    def __init__(self, in_dims, out_dims, upsample=True, norm_factory=nn.BatchNorm2d):
         super().__init__()
         layers = [
             nn.utils.spectral_norm(
                 nn.Conv2d(in_dims, out_dims, 3, padding=1, bias=True),
             ),
             nn.ReLU(True),
-            nn.BatchNorm2d(out_dims),
+            norm_factory(out_dims),
             nn.utils.spectral_norm(
                 nn.Conv2d(out_dims, out_dims, 3, padding=1, bias=True),
             ),
             nn.ReLU(True),
-            nn.BatchNorm2d(out_dims),
+            norm_factory(out_dims),
         ]
         if upsample:
             layers.insert(0, Interpolate(scale_factor=2, mode='bilinear', align_corners=True))
@@ -30,19 +30,19 @@ class GeneratorBlock(nn.Module):
 
 
 class ResidualGeneratorBlock(nn.Module):
-    def __init__(self, in_dims, out_dims, upsample=True):
+    def __init__(self, in_dims, out_dims, upsample=True, norm_factory=nn.BatchNorm2d):
         super().__init__()
         layers = [
             nn.utils.spectral_norm(
                 nn.Conv2d(in_dims, out_dims, 3, padding=1, bias=True),
             ),
             nn.ReLU(True),
-            nn.BatchNorm2d(out_dims),
+            norm_factory(out_dims),
             nn.utils.spectral_norm(
                 nn.Conv2d(out_dims, out_dims, 3, padding=1, bias=True),
             ),
             nn.ReLU(True),
-            nn.BatchNorm2d(out_dims),
+            norm_factory(out_dims),
         ]
         self.upsample = upsample
         self.project_input = None
@@ -63,17 +63,17 @@ class ResidualGeneratorBlock(nn.Module):
 
 
 class DiscriminatorBlock(nn.Module):
-    def __init__(self, in_dims, out_dims, first_conv=None):
+    def __init__(self, in_dims, out_dims, first_conv=None, norm_factory=nn.BatchNorm2d):
         super().__init__()
         layers = [
             nn.utils.spectral_norm(
                 nn.Conv2d(in_dims, out_dims, 3, padding=1, bias=True)),
             nn.LeakyReLU(0.2, inplace=True),
-            nn.BatchNorm2d(out_dims),
+            norm_factory(out_dims),
             nn.utils.spectral_norm(
                 nn.Conv2d(out_dims, out_dims, 3, padding=1, bias=True)),
             nn.LeakyReLU(0.2, inplace=True),
-            nn.BatchNorm2d(out_dims),
+            norm_factory(out_dims),
             Interpolate(scale_factor=0.5, mode='bilinear', align_corners=True),
         ]
         self.convs = nn.Sequential(*layers)
@@ -84,18 +84,18 @@ class DiscriminatorBlock(nn.Module):
 
 
 class ResidualDiscriminatorBlock(nn.Module):
-    def __init__(self, in_dims, out_dims, first_conv=None):
+    def __init__(self, in_dims, out_dims, first_conv=None, norm_factory=nn.BatchNorm2d):
         super().__init__()
         layers = [
             nn.utils.spectral_norm(
                 nn.Conv2d(in_dims, out_dims, 3, padding=1, bias=True),
             ),
             nn.LeakyReLU(0.2, inplace=True),
-            nn.BatchNorm2d(out_dims),
+            norm_factory(out_dims),
             nn.utils.spectral_norm(
                 nn.Conv2d(out_dims, out_dims, 3, padding=1, bias=True),
             ),
-            nn.BatchNorm2d(out_dims),
+            norm_factory(out_dims),
             #nn.LeakyReLU(0.2, inplace=True),
             Interpolate(scale_factor=0.5, mode='bilinear', align_corners=True),
         ]
@@ -125,6 +125,59 @@ class ResidualDiscriminatorBlock(nn.Module):
         return F.leaky_relu(x + h, 0.2)
 
 
+class GeneratorInputMLP(nn.Module):
+    def __init__(self, latent_dims, size=4):
+        super().__init__()
+        base_img_dims = size ** 2 * latent_dims
+        self.base_img = nn.Sequential(
+            nn.utils.spectral_norm(
+                nn.Linear(latent_dims, base_img_dims)
+            ),
+            nn.ReLU(),
+            #nn.BatchNorm1d(base_img_dims),
+        )
+
+    def forward(self, z):
+        img = self.base_img(z)
+        return img
+
+
+class TiledZGeneratorInput(nn.Module):
+    def __init__(self, latent_dims, size=4, norm_factory=nn.BatchNorm2d):
+        super().__init__()
+        self.size = size
+
+    def forward(self, z):
+        components = z[..., None, None].repeat(1, 1, self.size, self.size)
+        return components
+
+
+class WeightedComponents(nn.Module):
+    def __init__(self, latent_dims, size=4, num_components=None, norm_factory=nn.BatchNorm2d):
+        super().__init__()
+        num_components = latent_dims if num_components is None else num_components
+        self.components = nn.Parameter(
+            torch.randn(1, num_components, size, size, requires_grad=True) * 0.1
+            , requires_grad=True
+        )
+        self.img_weights = nn.Sequential(
+            # nn.utils.spectral_norm(
+                 nn.Linear(latent_dims, num_components),
+            # ),
+            # nn.LeakyReLU(0.2),
+            #nn.utils.spectral_norm(
+            #    nn.Linear(num_components, num_components),
+            #),
+            #nn.Sigmoid(),
+        )
+        self.output_norm = norm_factory(latent_dims)
+
+    def forward(self, z):
+        weights = self.img_weights(z)[..., None, None]
+        weighted = self.components * weights
+        return self.output_norm(F.leaky_relu(weighted, 0.2))#self.output_norm(weighted)
+
+
 class GeneratorOutput(nn.Module):
     def __init__(self, in_dims, out_dims):
         super().__init__()
@@ -139,6 +192,10 @@ class GeneratorOutput(nn.Module):
     def forward(self, x):
         return self.convs(x)
 
+
+class SpineBlock(nn.Module):
+    def __init__(self, in_dims, out_dims):
+        pass
 
 class DiscriminatorInput(nn.Module):
     def __init__(self, in_dims, out_dims):
