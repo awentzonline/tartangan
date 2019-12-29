@@ -12,12 +12,12 @@ class GeneratorBlock(nn.Module):
             nn.utils.spectral_norm(
                 nn.Conv2d(in_dims, out_dims, 3, padding=1, bias=True),
             ),
-            nn.ReLU(True),
+            nn.LeakyReLU(0.2),
             norm_factory(out_dims),
             nn.utils.spectral_norm(
                 nn.Conv2d(out_dims, out_dims, 3, padding=1, bias=True),
             ),
-            nn.ReLU(True),
+            nn.LeakyReLU(0.2),
             norm_factory(out_dims),
         ]
         if upsample:
@@ -36,12 +36,12 @@ class ResidualGeneratorBlock(nn.Module):
             nn.utils.spectral_norm(
                 nn.Conv2d(in_dims, out_dims, 3, padding=1, bias=True),
             ),
-            nn.ReLU(True),
+            nn.LeakyReLU(0.2),
             norm_factory(out_dims),
             nn.utils.spectral_norm(
                 nn.Conv2d(out_dims, out_dims, 3, padding=1, bias=True),
             ),
-            nn.ReLU(True),
+            nn.LeakyReLU(0.2),
             norm_factory(out_dims),
         ]
         self.upsample = upsample
@@ -197,6 +197,7 @@ class SpineBlock(nn.Module):
     def __init__(self, in_dims, out_dims):
         pass
 
+
 class DiscriminatorInput(nn.Module):
     def __init__(self, in_dims, out_dims):
         super().__init__()
@@ -204,7 +205,7 @@ class DiscriminatorInput(nn.Module):
             nn.utils.spectral_norm(
                 nn.Conv2d(in_dims, out_dims, 1, padding=0, bias=True),
             ),
-            nn.ReLU(),
+            nn.LeakyReLU(0.2),
         )
         map(nn.init.orthogonal_, self.parameters())
 

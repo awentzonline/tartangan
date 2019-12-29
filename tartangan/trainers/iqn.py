@@ -112,8 +112,15 @@ class ProgressiveIQNTrainer(Trainer):
         for d_i in range(self.args.iters_d):
             self.d.zero_grad()
             batch_imgs, labels = self.make_adversarial_batch(imgs, blend=self.block_blend)
+            batch_size = len(imgs)
+            # _, d_real_loss = self.d(
+            #     batch_imgs[:batch_size], targets=labels[:batch_size], blend=self.block_blend
+            # )
+            # _, d_fake_loss = self.d(
+            #     batch_imgs[batch_size:], targets=labels[batch_size:], blend=self.block_blend
+            # )
+            # d_loss = (d_fake_loss + d_real_loss)# / 2
             p_labels, d_loss = self.d(batch_imgs, targets=labels, blend=self.block_blend)
-            #d_loss = self.d_loss(p_labels, labels, taus)
             d_loss.backward()
             self.d.step_optimizers()
         # train generator

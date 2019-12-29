@@ -9,7 +9,7 @@ class QuantileEmbedding(nn.Module):
         self.embedding_dims = embedding_dims
         self.hidden = nn.Sequential(
             nn.Linear(self.embedding_dims, self.embedding_dims),
-            nn.ReLU(),
+            nn.LeakyReLU(0.2),
             norm_factory(self.embedding_dims),
         )
         self.to_state = nn.Sequential(
@@ -25,7 +25,7 @@ class QuantileEmbedding(nn.Module):
 
 class IQN(nn.Module):
     def __init__(self, feature_dims, quantile_dims=64, num_quantiles=8, mix='mult',
-                 norm_factory=nn.BatchNorm1d):
+                 norm_factory=nn.BatchNorm1d):#nn.Identity):#
         super().__init__()
         self.quantile_embedding = QuantileEmbedding(
             feature_dims, quantile_dims, norm_factory=norm_factory
