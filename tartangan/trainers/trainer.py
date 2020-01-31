@@ -1,8 +1,10 @@
 import argparse
 import functools
+import hashlib
 import os
 
 import numpy as np
+from PIL import Image
 import torch
 from torch import nn
 import torch.utils.data as data_utils
@@ -11,7 +13,14 @@ from torchvision import transforms
 import tqdm
 
 from tartangan.image_dataset import JustImagesDataset
+from tartangan.models.blocks import (
+    ResidualDiscriminatorBlock, ResidualGeneratorBlock,
+    GeneratorInputMLP, TiledZGeneratorInput
+)
 from tartangan.models.cnn import GeneratorCNN, DiscriminatorCNN
+from tartangan.models.losses import (
+    discriminator_hinge_loss, generator_hinge_loss, gradient_penalty
+)
 
 
 class Trainer:
@@ -24,15 +33,20 @@ class Trainer:
     def train(self):
         os.makedirs(os.path.dirname(self.args.sample_file), exist_ok=True)
         os.makedirs(os.path.dirname(self.args.checkpoint), exist_ok=True)
-        self.progress_samples = self.sample_z(32)
         self.build_models()
+        self.progress_samples = self.sample_z(32)
+        img_size = self.g.max_size
         transform = transforms.Compose([
-            transforms.Resize((self.args.img_size, self.args.img_size)),
+            transforms.Resize((img_size, img_size), interpolation=Image.LANCZOS),
             transforms.ToTensor()
         ])
-        dataset = JustImagesDataset(self.args.data_path, transform=transform)
+        self.dataset = dataset = JustImagesDataset(
+            self.args.data_path, transform=transform
+        )
+        if self.args.dataset_cache:
+            self.dataset.load_cache(self.dataset_cache_path(img_size))
         train_loader = data_utils.DataLoader(
-            dataset, batch_size=self.args.batch_size, shuffle=True
+            dataset, batch_size=self.args.batch_size, shuffle=True, drop_last=True
         )
         steps = 0
         for epoch_i in range(self.args.epochs):
@@ -45,6 +59,15 @@ class Trainer:
                     self.output_samples(f'{self.args.sample_file}_{steps}.png')
                 if steps % self.args.checkpoint_freq == 0:
                     self.save_checkpoint(f'{self.args.checkpoint}_{steps}')
+            if epoch_i == 0:
+                self.dataset.save_cache(self.dataset_cache_path(img_size))
+
+    def dataset_cache_path(self, size):
+        root_hash = hashlib.md5(self.dataset.root.encode('utf-8')).hexdigest()
+        return self.args.dataset_cache.format(
+            root=root_hash,
+            size=size
+        )
 
     def train_batch(self, imgs):
         # train discriminator
@@ -64,7 +87,7 @@ class Trainer:
         self.g.train()
         self.d.eval()
         batch_imgs, labels = self.make_generator_batch(imgs)
-        #torchvision.utils.save_image(batch_imgs, 'batch.png')
+        # torchvision.utils.save_image(batch_imgs, 'batch.png')
         p_labels = self.d(batch_imgs)
         g_loss = self.d_loss(p_labels, labels)
         g_loss.backward()
@@ -77,11 +100,14 @@ class Trainer:
     def sample_z(self, n=None):
         if n is None:
             n = self.args.batch_size
-        return torch.randn(n, self.args.latent_dims).to(self.device)
+        return torch.randn(n, self.gan_config.latent_dims).to(self.device)
 
-    def sample_g(self, n=None, **g_kwargs):
+    def sample_g(self, n=None, target_g=False, **g_kwargs):
         z = self.sample_z(n)
-        imgs = self.g(z, **g_kwargs)
+        if target_g:
+            imgs = self.target_g(z, **g_kwargs)
+        else:
+            imgs = self.g(z, **g_kwargs)
         return imgs
 
     def make_adversarial_batch(self, real_data, **g_kwargs):
@@ -92,22 +118,26 @@ class Trainer:
         return batch, labels
 
     def make_generator_batch(self, real_data, **g_kwargs):
-        generated_data = self.sample_g(len(real_data) * 2, **g_kwargs)
+        generated_data = self.sample_g(len(real_data), **g_kwargs)
         labels = torch.ones(len(generated_data), 1).to(self.device)
         return generated_data, labels
 
     def output_samples(self, filename, n=None):
         with torch.no_grad():
-            imgs = self.g(self.progress_samples)
-            torchvision.utils.save_image(imgs, filename)
+            imgs = self.target_g(self.progress_samples)[:16]
+            imgs_g = self.g(self.progress_samples)[:16]
+            imgs = torch.cat([imgs, imgs_g], dim=0)
+            torchvision.utils.save_image(imgs, filename, range=(-1, 1), normalize=True)
             if not hasattr(self, '_latent_grid_samples'):
                 self._latent_grid_samples = self.sample_latent_grid(5, 5)
-            grid_imgs = self.g(self._latent_grid_samples)
+            grid_imgs = self.target_g(self._latent_grid_samples)
+            # grid_imgs_g = self.g(self._latent_grid_samples)
+            # grid_imgs = torch.cat([grid_imgs, grid_imgs_g], dim=0)
             torchvision.utils.save_image(
                 grid_imgs, os.path.join(
                     os.path.dirname(filename), f'grid_{os.path.basename(filename)}'
                 ),
-                nrow=5
+                nrow=5, range=(-1, 1), normalize=True
             )
 
     def sample_latent_grid(self, nrows, ncols):
@@ -142,42 +172,25 @@ class Trainer:
         return self.args.device
 
 
-class CNNTrainer(Trainer):
-    def build_models(self):
-        depth = int(np.log2(self.args.img_size) - np.log2(self.args.base_size))
-        print(f'depth = {depth}')
-        self.g = GeneratorCNN(
-            self.args.latent_dims, self.args.img_size,
-            depth=depth, base_dims=self.args.base_dims
-        ).to(self.device)
-        self.d = DiscriminatorCNN(
-            self.args.img_size,
-            depth=depth, base_dims=self.args.base_dims
-        ).to(self.device)
-        self.optimizer_g = torch.optim.Adam(self.g.parameters(), lr=self.args.lr_g)
-        self.optimizer_d = torch.optim.Adam(self.d.parameters(), lr=self.args.lr_d)
-        self.d_loss = nn.BCELoss()
-        print(self.g)
-        print(self.d)
-
-
 if __name__ == '__main__':
     p = argparse.ArgumentParser()
     p.add_argument('data_path')
     p.add_argument('--batch-size', type=int, default=128)
     p.add_argument('--gen-freq', type=int, default=200)
     p.add_argument('--img-size', type=int, default=128)
-    p.add_argument('--latent-dims', type=int, default=50)
+    p.add_argument('--latent-dims', type=int, default=128)
     p.add_argument('--lr-g', type=float, default=1e-3)
     p.add_argument('--lr-d', type=float, default=4e-3)
     p.add_argument('--iters-d', type=int, default=1)
     p.add_argument('--device', default='cpu')
     p.add_argument('--epochs', type=int, default=10000)
     p.add_argument('--base-size', type=int, default=4)
-    p.add_argument('--base-dims', type=int, default=32)
+    p.add_argument('--base-dims', type=int, default=16)
     p.add_argument('--sample-file', default='sample/tartangan')
     p.add_argument('--checkpoint-freq', type=int, default=100000)
     p.add_argument('--checkpoint', default='checkpoint/tartangan')
+    p.add_argument('--dataset-cache', default='cache/{root}_{size}.pkl')
+    p.add_argument('--grad-penalty', type=float, default=5.)
     args = p.parse_args()
 
     trainer = CNNTrainer(args)

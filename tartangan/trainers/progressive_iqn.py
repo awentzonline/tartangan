@@ -3,6 +3,7 @@ import functools
 import hashlib
 import os
 
+from PIL import Image
 import torch
 from torch import nn
 import torch.utils.data as data_utils
@@ -11,34 +12,46 @@ from torchvision import transforms
 import tqdm
 
 from tartangan.image_dataset import JustImagesDataset
+from tartangan.models.blocks import (
+    ResidualDiscriminatorBlock, ResidualGeneratorBlock, IQNDiscriminatorOutput
+)
+from tartangan.models.iqn import iqn_loss
 from tartangan.models.losses import discriminator_hinge_loss, generator_hinge_loss
 from tartangan.models.progressive import (
-    ProgressiveGenerator, ProgressiveDiscriminator, GAN_CONFIGS
+    ProgressiveGenerator, ProgressiveIQNDiscriminator, GAN_CONFIGS
 )
 from .trainer import Trainer
 
 
-class ProgressiveTrainer(Trainer):
+class ProgressiveIQNTrainer(Trainer):
     def build_models(self):
         gan_config = GAN_CONFIGS[self.args.config]
         # generator
         g_optimizer_factory = functools.partial(
             torch.optim.Adam, lr=self.args.lr_g
         )
+        g_block_factory = functools.partial(
+            ResidualGeneratorBlock, #norm_factory=nn.Identity#nn.BatchNorm2d
+        )
         self.g = ProgressiveGenerator(
-            gan_config, optimizer_factory=g_optimizer_factory
+            gan_config, optimizer_factory=g_optimizer_factory,
+            block_class=g_block_factory
         ).to(self.device)
         # discriminator
         d_optimizer_factory = functools.partial(
             torch.optim.Adam, lr=self.args.lr_d
         )
-        self.d = ProgressiveDiscriminator(
-            gan_config, optimizer_factory=d_optimizer_factory
+        d_block_factory = functools.partial(
+            ResidualDiscriminatorBlock, #norm_factory=nn.Identity#nn.BatchNorm2d
+        )
+        self.d = ProgressiveIQNDiscriminator(
+            gan_config, optimizer_factory=d_optimizer_factory,
+            output_class=IQNDiscriminatorOutput
         ).to(self.device)
         print(self.g)
         print(self.d)
-        self.d_loss = discriminator_hinge_loss
-        self.g_loss = generator_hinge_loss
+        self.d_loss = iqn_loss
+        self.g_loss = iqn_loss
         self.gan_config = gan_config
         # blending
         self.block_blend = 0
@@ -69,10 +82,10 @@ class ProgressiveTrainer(Trainer):
         # possibly save for cache
         if hasattr(self, 'dataset'):
             if self.args.dataset_cache and self.g.current_size <= 16:
-                self.dataset.save_cache(self.dataset_cache_path)
+                self.dataset.save_cache(self.dataset_cache_path(self.g.current_size // 2))
 
         transform = transforms.Compose([
-            transforms.Resize((self.g.current_size, self.g.current_size)),
+            transforms.Resize((self.g.current_size, self.g.current_size), Image.LANCZOS),
             transforms.ToTensor()
         ])
         self.dataset = JustImagesDataset(self.args.data_path, transform=transform)
@@ -80,16 +93,14 @@ class ProgressiveTrainer(Trainer):
             self.dataset, batch_size=self.args.batch_size, shuffle=True,
             num_workers=self.args.workers
         )
-
         if self.args.dataset_cache and self.g.current_size <= 16:
-            self.dataset.load_cache(self.dataset_cache_path)
+            self.dataset.load_cache(self.dataset_cache_path(self.g.current_size))
 
-    @property
-    def dataset_cache_path(self):
+    def dataset_cache_path(self, size):
         root_hash = hashlib.md5(self.dataset.root.encode('utf-8')).hexdigest()
         return self.args.dataset_cache.format(
             root=root_hash,
-            size=self.g.current_size // 2
+            size=size
         )
 
     def train_batch(self, imgs):
@@ -101,11 +112,15 @@ class ProgressiveTrainer(Trainer):
         for d_i in range(self.args.iters_d):
             self.d.zero_grad()
             batch_imgs, labels = self.make_adversarial_batch(imgs, blend=self.block_blend)
-            p_labels = self.d(batch_imgs, blend=self.block_blend)
-            p_real_labels = p_labels[:len(p_labels) // 2]
-            p_fake_labels = p_labels[len(p_labels) // 2:]
-            d_real_loss, d_fake_loss = self.d_loss(p_real_labels, p_fake_labels)
-            d_loss = d_real_loss + d_fake_loss
+            batch_size = len(imgs)
+            # _, d_real_loss = self.d(
+            #     batch_imgs[:batch_size], targets=labels[:batch_size], blend=self.block_blend
+            # )
+            # _, d_fake_loss = self.d(
+            #     batch_imgs[batch_size:], targets=labels[batch_size:], blend=self.block_blend
+            # )
+            # d_loss = (d_fake_loss + d_real_loss)# / 2
+            p_labels, d_loss = self.d(batch_imgs, targets=labels, blend=self.block_blend)
             d_loss.backward()
             self.d.step_optimizers()
         # train generator
@@ -113,18 +128,17 @@ class ProgressiveTrainer(Trainer):
         self.g.train()
         self.d.eval()
         batch_imgs, labels = self.make_generator_batch(imgs, blend=self.block_blend)
-        #torchvision.utils.save_image(imgs, 'batch.png')
-        p_labels = self.d(batch_imgs, blend=self.block_blend)
-        g_loss = self.g_loss(p_labels)
+        #torchvision.utils.save_image(imgs, 'batch.png', range=(-1, 1), normalize=True)
+        p_labels, g_loss = self.d(batch_imgs, targets=labels, blend=self.block_blend)
         g_loss.backward()
-        # gs = [[p.grad.mean() for p in b.parameters()] for b in (self.g.input_block,)]
+        # gs = [[p.grad.mean() for p in b.parameters()] for b in self.g.blocks]
         # print(gs)
         self.g.step_optimizers()
 
         return dict(
             g_loss=float(g_loss), d_loss=float(d_loss),
             blend=self.block_blend,
-            real_loss=float(d_real_loss), fake_loss=float(d_fake_loss)
+        #    real_loss=float(d_real_loss), fake_loss=float(d_fake_loss)
         )
 
     def output_samples(self, filename, n=None):
@@ -180,18 +194,19 @@ def main():
     p.add_argument('--lr-d', type=float, default=4e-3)
     p.add_argument('--iters-d', type=int, default=1)
     p.add_argument('--device', default='cpu')
-    p.add_argument('--epochs', type=int, default=10000)
+    p.add_argument('--epochs', type=int, default=100000)
     p.add_argument('--base-size', type=int, default=4)
     p.add_argument('--base-dims', type=int, default=32)
     p.add_argument('--sample-file', default='sample/tartangan')
     p.add_argument('--blend-steps', type=int, default=100)
     p.add_argument('--config', default='64')
-    p.add_argument('--checkpoint-freq', type=int, default=100000)
+    p.add_argument('--checkpoint-freq', type=int, default=10000)
     p.add_argument('--checkpoint', default='checkpoint/tartangan')
     p.add_argument('--workers', type=int, default=0)
-    p.add_argument('--dataset-cache', default='cache/cache_{size}.pkl')
+    p.add_argument('--dataset-cache', default='cache/{root}_{size}.pkl')
     args = p.parse_args()
-    trainer = ProgressiveTrainer(args)
+
+    trainer = ProgressiveIQNTrainer(args)
     trainer.train()
 
 

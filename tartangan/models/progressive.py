@@ -20,7 +20,7 @@ class ProgressiveGenerator(nn.Module):
     def __init__(
         self, config, output_channels=3, optimizer_factory=torch.optim.Adam,
         base_size=4, device='cpu', block_class=ResidualGeneratorBlock,
-        input_class=WeightedComponents, output_class=GeneratorOutput
+        input_class=TiledZGeneratorInput, output_class=GeneratorOutput
     ):
         super().__init__()
         self.config = config
@@ -220,6 +220,13 @@ class ProgressiveIQNDiscriminator(ProgressiveDiscriminator):
 
 
 GAN_CONFIGS = {
+    '16': ProgressiveConfig(
+        latent_dims=32,
+        blocks=(
+            32,  # 4,
+            16,  # 8,
+        )
+    ),
     '64': ProgressiveConfig(
         latent_dims=128,
         blocks=(
