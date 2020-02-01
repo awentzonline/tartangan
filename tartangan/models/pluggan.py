@@ -100,7 +100,6 @@ class IQNDiscriminator(Discriminator):
 
     def forward(self, x, targets=None):
         y = self.blocks(x)
-        print(y.shape)
         out = self.to_output(y, targets=targets)
         return out
 

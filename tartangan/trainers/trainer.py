@@ -71,7 +71,7 @@ class Trainer:
 
     def train_batch(self, imgs):
         # train discriminator
-        self.g.eval()
+        self.g.train()
         self.d.train()
         imgs = imgs.to(self.device)
         # train discriminator
@@ -82,9 +82,9 @@ class Trainer:
             d_loss = self.d_loss(p_labels, labels)
             d_loss.backward()
             self.optimizer_d.step()
+
         # train generator
         self.optimizer_g.zero_grad()
-        self.g.train()
         self.d.eval()
         batch_imgs, labels = self.make_generator_batch(imgs)
         # torchvision.utils.save_image(batch_imgs, 'batch.png')

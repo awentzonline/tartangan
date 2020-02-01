@@ -33,8 +33,6 @@ class CNNTrainer(Trainer):
         d_block_factory = functools.partial(
             ResidualDiscriminatorBlock, #norm_factory=nn.Identity#nn.BatchNorm2d
         )
-        g_block_factory = GeneratorBlock
-        d_block_factory = DiscriminatorBlock
         self.g = Generator(
             self.gan_config,
             input_factory=TiledZGeneratorInput,
@@ -62,34 +60,38 @@ class CNNTrainer(Trainer):
     def train_batch(self, imgs):
         #print(imgs.min(), imgs.mean(), imgs.max())
         imgs = imgs.to(self.device)
-        # train discriminator
-        self.g.eval()
+        self.g.train()
         self.d.train()
+        # train discriminator
         toggle_grad(self.g, False)
         toggle_grad(self.d, True)
         self.optimizer_d.zero_grad()
         batch_imgs, labels = self.make_adversarial_batch(imgs)
         real, fake = batch_imgs[:self.args.batch_size], batch_imgs[self.args.batch_size:]
+        # torchvision.utils.save_image(real, 'batch_real.png', normalize=True, range=(-1, 1))
+        # torchvision.utils.save_image(fake, 'batch_fake.png', normalize=True, range=(-1, 1))
+        real.requires_grad_()
         p_labels_real = self.d(real)
         p_labels_fake = self.d(fake.detach())
         p_labels = torch.cat([p_labels_real, p_labels_fake], dim=0)
-        loss_real, loss_fake = self.d_loss(labels, p_labels)
-        #d_loss = loss_real + loss_fake
-        #d_loss = -torch.mean(p_labels_real) + torch.mean(p_labels_fake)
+        # loss_real, loss_fake = self.d_loss(labels, p_labels)
+        # d_loss = loss_real + loss_fake
+        # d_loss = (
+        #     self.bce_loss(p_labels_real, labels[:len(labels) // 2]) +
+        #     self.bce_loss(p_labels_fake, labels[len(labels) // 2:])
+        # )
         d_loss = self.bce_loss(p_labels, labels)
-        d_grad_penalty = 0#self.args.grad_penalty * gradient_penalty(p_labels, real)
-        #d_loss += d_grad_penalty
+        d_grad_penalty = self.args.grad_penalty * gradient_penalty(p_labels_real, real)
+        d_loss += d_grad_penalty
         d_loss.backward()
         self.optimizer_d.step()
 
         # train generator
-        self.g.train()
-        self.d.eval()
         toggle_grad(self.g, True)
         toggle_grad(self.d, False)
         self.optimizer_g.zero_grad()
         batch_imgs, labels = self.make_generator_batch(imgs)
-        # torchvision.utils.save_image((imgs + 1) / 2, 'batch.png')
+        #torchvision.utils.save_image(batch_imgs, 'batch.png', normalize=True, range=(-1, 1))
         p_labels = self.d(batch_imgs)
         #g_loss = self.g_loss(p_labels)
         g_loss = self.bce_loss(p_labels, labels)

@@ -24,7 +24,7 @@ def gradient_penalty(preds, data):
     https://discuss.pytorch.org/t/gradient-penalty-with-respect-to-the-network-parameters/11944/4
     """
     outputs = torch.ones_like(preds).to(preds.device)
-    # data.requires_grad_ = True
+    data.requires_grad_()
     gradients = torch.autograd.grad(
         outputs=preds.sum(1, keepdim=True), inputs=data,
         grad_outputs=outputs,
@@ -35,8 +35,9 @@ def gradient_penalty(preds, data):
     return gradient_norm_sq.mean()
 
 
-def gradient_penalty(preds, data):
-    grad_real = torch.autograd.grad(outputs=preds.sum(), inputs=data, create_graph=True)[0]
-    grad_penalty_real = (grad_real.view(grad_real.size(0), -1).norm(2, dim=1) ** 2).mean()
-    # grad_penalty_real = 10 / 2 * grad_penalty_real
-    return grad_penalty_real
+# def gradient_penalty(preds, data):
+#     data.requires_grad_()
+#     grad_real = torch.autograd.grad(outputs=preds.sum(), inputs=data, create_graph=True)[0]
+#     grad_penalty_real = (grad_real.view(grad_real.size(0), -1).norm(2, dim=1) ** 2).mean()
+#     # grad_penalty_real = 10 / 2 * grad_penalty_real
+#     return grad_penalty_real

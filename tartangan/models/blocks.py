@@ -249,7 +249,7 @@ class IQNDiscriminatorOutput(nn.Module):
         )
         map(nn.init.orthogonal_, self.parameters())
         # avoid ortho init for IQN
-        feats_dims = 2 * 2 * in_dims
+        feats_dims = 4 * 4 * in_dims
         self.iqn = IQN(feats_dims)
         self.out_dims = out_dims
 
