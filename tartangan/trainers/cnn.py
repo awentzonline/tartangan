@@ -28,10 +28,10 @@ class CNNTrainer(Trainer):
     def build_models(self):
         self.gan_config = GAN_CONFIGS[self.args.config]
         g_block_factory = functools.partial(
-            ResidualGeneratorBlock, #norm_factory=nn.Identity#nn.BatchNorm2d
+            ResidualGeneratorBlock, #norm_factory=nn.Identity#nn.BatchNorm2d#nn.InstanceNorm2d#
         )
         d_block_factory = functools.partial(
-            ResidualDiscriminatorBlock, #norm_factory=nn.Identity#nn.BatchNorm2d
+            ResidualDiscriminatorBlock, #norm_factory=nn.Identity#nn.BatchNorm2d#nn.InstanceNorm2d#
         )
         self.g = Generator(
             self.gan_config,
@@ -70,7 +70,8 @@ class CNNTrainer(Trainer):
         real, fake = batch_imgs[:self.args.batch_size], batch_imgs[self.args.batch_size:]
         # torchvision.utils.save_image(real, 'batch_real.png', normalize=True, range=(-1, 1))
         # torchvision.utils.save_image(fake, 'batch_fake.png', normalize=True, range=(-1, 1))
-        real.requires_grad_()
+        if self.args.grad_penalty:
+            real.requires_grad_()
         p_labels_real = self.d(real)
         p_labels_fake = self.d(fake.detach())
         p_labels = torch.cat([p_labels_real, p_labels_fake], dim=0)
@@ -81,8 +82,9 @@ class CNNTrainer(Trainer):
         #     self.bce_loss(p_labels_fake, labels[len(labels) // 2:])
         # )
         d_loss = self.bce_loss(p_labels, labels)
-        d_grad_penalty = self.args.grad_penalty * gradient_penalty(p_labels_real, real)
-        d_loss += d_grad_penalty
+        if self.args.grad_penalty:
+            d_grad_penalty = self.args.grad_penalty * gradient_penalty(p_labels_real, real)
+            d_loss += d_grad_penalty
         d_loss.backward()
         self.optimizer_d.step()
 

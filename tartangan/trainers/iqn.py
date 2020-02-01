@@ -69,12 +69,14 @@ class IQNTrainer(Trainer):
         real, fake = batch_imgs[:self.args.batch_size], batch_imgs[self.args.batch_size:]
         # torchvision.utils.save_image(real, 'batch_real.png', normalize=True, range=(-1, 1))
         # torchvision.utils.save_image(fake, 'batch_fake.png', normalize=True, range=(-1, 1))
-        real.requires_grad_()
+        if self.args.grad_penalty:
+            real.requires_grad_()
         p_labels_real, d_loss_real = self.d(real, targets=labels[:len(labels) // 2])
         p_labels_fake, d_loss_fake = self.d(fake.detach(), targets=labels[len(labels) // 2])
         d_loss = d_loss_real + d_loss_fake
-        d_grad_penalty = 0. #self.args.grad_penalty * gradient_penalty(p_labels_real, real)
-        #d_loss += d_grad_penalty
+        if self.args.grad_penalty:
+            d_grad_penalty = self.args.grad_penalty * gradient_penalty(p_labels_real, real)
+            d_loss += d_grad_penalty
         d_loss.backward()
         self.optimizer_d.step()
 
