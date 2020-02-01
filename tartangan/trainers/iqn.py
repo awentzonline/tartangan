@@ -33,8 +33,6 @@ class IQNTrainer(Trainer):
         d_block_factory = functools.partial(
             ResidualDiscriminatorBlock, #norm_factory=nn.Identity#nn.BatchNorm2d
         )
-        g_block_factory = GeneratorBlock
-        d_block_factory = DiscriminatorBlock
         self.g = Generator(
             self.gan_config,
             input_factory=TiledZGeneratorInput,
@@ -74,6 +72,7 @@ class IQNTrainer(Trainer):
         p_labels_real, d_loss_real = self.d(real, targets=labels[:len(labels) // 2])
         p_labels_fake, d_loss_fake = self.d(fake.detach(), targets=labels[len(labels) // 2])
         d_loss = d_loss_real + d_loss_fake
+        d_grad_penalty = 0.
         if self.args.grad_penalty:
             d_grad_penalty = self.args.grad_penalty * gradient_penalty(p_labels_real, real)
             d_loss += d_grad_penalty

@@ -82,6 +82,7 @@ class CNNTrainer(Trainer):
         #     self.bce_loss(p_labels_fake, labels[len(labels) // 2:])
         # )
         d_loss = self.bce_loss(p_labels, labels)
+        d_grad_penalty = 0.
         if self.args.grad_penalty:
             d_grad_penalty = self.args.grad_penalty * gradient_penalty(p_labels_real, real)
             d_loss += d_grad_penalty
