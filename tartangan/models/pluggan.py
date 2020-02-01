@@ -110,8 +110,8 @@ GAN_CONFIGS = {
         data_dims=3,
         latent_dims=100,
         blocks=(
-            64,  # 4,
-            32,  # 8,
+            64,  # 8,
+            32,  # 16,
         )
     ),
     '32': GANConfig(
@@ -119,7 +119,6 @@ GAN_CONFIGS = {
         data_dims=3,
         latent_dims=128,
         blocks=(
-            128,  # 4,
             128,  # 8,
             64,  # 16,
             32,  # 32,
@@ -130,24 +129,22 @@ GAN_CONFIGS = {
         data_dims=3,
         latent_dims=128,
         blocks=(
-            128,  # 4,
             128,  # 8,
-            64,  # 16,
-            32,  # 32,
-            16,  # 64,
+            128,  # 16,
+            64,  # 32,
+            32,  # 64,
         )
     ),
     '128': GANConfig(
         base_size=4,
         data_dims=3,
-        latent_dims=256,
+        latent_dims=128,
         blocks=(
-            256,  # 4,
-            256,  # 8,
+            128,  # 8,
             128,  # 16,
             64,  # 32,
             32,  # 64,
-            16,  # 128
+            16,  # 128,
         )
     ),
     '256': GANConfig(
@@ -155,72 +152,55 @@ GAN_CONFIGS = {
         data_dims=3,
         latent_dims=256,
         blocks=(
-            256,  # 4,
             256,  # 8,
             256,  # 16,
             128,  # 32,
             64,  # 64,
-            32,  # 128
-            16   # 256
-        )
-    ),
-    '256thin': GANConfig(
-        base_size=4,
-        data_dims=3,
-        latent_dims=128,
-        blocks=(
-            128,  # 4,
-            128,  # 8,
-            128,  # 16,
-            64,  # 32,
-            32,  # 64,
-            16,  # 128
-            8   # 256
-        )
-    ),
-    # Test the effects of shortcut projection to other n-filters
-    '256thin-test': GANConfig(
-        base_size=4,
-        data_dims=3,
-        latent_dims=128,
-        blocks=(
-            128,  # 4,
-            120,  # 8,
-            100,  # 16,
-            64,  # 32,
-            32,  # 64,
-            16,  # 128
-            8   # 256
+            32,  # 128,
+            16,  # 256
         )
     ),
     '512': GANConfig(
         base_size=4,
         data_dims=3,
-        latent_dims=512,
+        latent_dims=256,
         blocks=(
-            512,  # 4,
-            512,  # 8,
-            512,  # 16,
-            256,  # 32,
-            128,  # 64,
+            256,  # 8
+            256,  # 16
+            256,  # 32
+            128,  # 64
             64,  # 128
             32,  # 256
-            16,  # 512
+            16   # 512
         )
     ),
     '512thin': GANConfig(
         base_size=4,
         data_dims=3,
-        latent_dims=256,
+        latent_dims=128,
         blocks=(
-            256,  # 4,
-            256,  # 8,
-            256,  # 16,
+            128,  # 8,
+            128,  # 16,
             128,  # 32,
             64,  # 64,
-            32,  # 128
+            32,  # 128,
             16,  # 256
-            8,  # 512
+            8   # 512
+        )
+    ),
+    # Test the effects of shortcut projection to other n-filters
+    '512thin-test': GANConfig(
+        base_size=4,
+        data_dims=3,
+        latent_dims=128,
+        blocks=(
+            128,  # 8,
+            120,  # 16,
+            100,  # 32,
+            64,  # 64,
+            32,  # 128,
+            16,  # 256
+            8   # 512
         )
     ),
     '1024': GANConfig(
@@ -228,27 +208,41 @@ GAN_CONFIGS = {
         data_dims=3,
         latent_dims=512,
         blocks=(
-            512,  # 4,
             512,  # 8,
             512,  # 16,
             512,  # 32,
             256,  # 64,
-            128,  # 128
+            128,  # 128,
             64,  # 256
             32,  # 512
             16,  # 1024
         )
     ),
-    'test': GANConfig(
+    '1024thin': GANConfig(
+        base_size=4,
+        data_dims=3,
+        latent_dims=256,
+        blocks=(
+            256,  # 8,
+            256,  # 16,
+            256,  # 32,
+            128,  # 64,
+            64,  # 128,
+            32,  # 256
+            16,  # 512
+            8,  # 1024
+        )
+    ),
+    'test128': GANConfig(
         base_size=4,
         data_dims=3,
         latent_dims=64,
         blocks=(
-            64,  # 4,
-            32,  # 8,
-            16,  # 16,
-            8,  # 32,
-            4,  # 64,
+            64,  # 8,
+            32,  # 16,
+            16,  # 32,
+            8,  # 64,
+            4,  # 128,
         )
     ),
     'test256': GANConfig(
@@ -256,7 +250,6 @@ GAN_CONFIGS = {
         data_dims=3,
         latent_dims=256,
         blocks=(
-            256,  # 4,
             200,  # 8,
             180,  # 16,
             128,  # 32,
