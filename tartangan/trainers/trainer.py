@@ -17,7 +17,6 @@ from tartangan.models.blocks import (
     ResidualDiscriminatorBlock, ResidualGeneratorBlock,
     GeneratorInputMLP, TiledZGeneratorInput
 )
-from tartangan.models.cnn import GeneratorCNN, DiscriminatorCNN
 from tartangan.models.losses import (
     discriminator_hinge_loss, generator_hinge_loss, gradient_penalty
 )
@@ -38,7 +37,8 @@ class Trainer:
         img_size = self.g.max_size
         transform = transforms.Compose([
             transforms.Resize((img_size, img_size), interpolation=Image.LANCZOS),
-            transforms.ToTensor()
+            transforms.ToTensor(),
+            transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
         ])
         self.dataset = dataset = JustImagesDataset(
             self.args.data_path, transform=transform
@@ -127,7 +127,7 @@ class Trainer:
             imgs = self.target_g(self.progress_samples)[:16]
             imgs_g = self.g(self.progress_samples)[:16]
             imgs = torch.cat([imgs, imgs_g], dim=0)
-            torchvision.utils.save_image(imgs, filename, range=(-1, 1), normalize=True)
+            torchvision.utils.save_image(imgs, filename, normalize=True, range=(-1, 1))
             if not hasattr(self, '_latent_grid_samples'):
                 self._latent_grid_samples = self.sample_latent_grid(5, 5)
             grid_imgs = self.target_g(self._latent_grid_samples)
@@ -136,8 +136,8 @@ class Trainer:
             torchvision.utils.save_image(
                 grid_imgs, os.path.join(
                     os.path.dirname(filename), f'grid_{os.path.basename(filename)}'
-                ),
-                nrow=5, range=(-1, 1), normalize=True
+                ), nrow=5,
+                normalize=True, range=(-1, 1),
             )
 
     def sample_latent_grid(self, nrows, ncols):
@@ -179,9 +179,8 @@ if __name__ == '__main__':
     p.add_argument('--gen-freq', type=int, default=200)
     p.add_argument('--img-size', type=int, default=128)
     p.add_argument('--latent-dims', type=int, default=128)
-    p.add_argument('--lr-g', type=float, default=1e-3)
-    p.add_argument('--lr-d', type=float, default=4e-3)
-    p.add_argument('--iters-d', type=int, default=1)
+    p.add_argument('--lr-g', type=float, default=1e-4)
+    p.add_argument('--lr-d', type=float, default=4e-4)
     p.add_argument('--device', default='cpu')
     p.add_argument('--epochs', type=int, default=10000)
     p.add_argument('--base-size', type=int, default=4)

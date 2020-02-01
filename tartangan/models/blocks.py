@@ -229,8 +229,7 @@ class DiscriminatorOutput(nn.Module):
                 nn.Conv2d(in_dims, out_dims, 1, padding=0, bias=True),
             # ),
             # nn.Tanh()
-            # nn.Sigmoid()
-            # nn.LeakyReLU(0.2)
+            nn.Sigmoid()
         )
         map(nn.init.orthogonal_, self.parameters())
 

@@ -109,10 +109,10 @@ GAN_CONFIGS = {
     '16': GANConfig(
         base_size=4,
         data_dims=3,
-        latent_dims=64,
+        latent_dims=100,
         blocks=(
-            32,  # 4,
-            16,  # 8,
+            64,  # 4,
+            32,  # 8,
         )
     ),
     '32': GANConfig(
