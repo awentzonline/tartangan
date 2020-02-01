@@ -142,16 +142,18 @@ class Trainer:
 
     def sample_latent_grid(self, nrows, ncols):
         top_left, top_right, bottom_left, bottom_right = self.sample_z(4)
-        left_drow = (bottom_left - top_left) / nrows
-        right_drow = (bottom_right - top_right) / nrows
+        left_col = [
+            slerp(x, top_left, bottom_left) for x in np.linspace(0, 1, nrows)
+        ]
+        right_col = [
+            slerp(x, top_right, bottom_right) for x in np.linspace(0, 1, nrows)
+        ]
         rows = []
-        weights = torch.linspace(0, 1, ncols)[None, ...].T.to(self.device)
-        left, right = top_left, top_right
-        for row_i in range(nrows):
-            row = left + weights * (right - left)
-            left += left_drow
-            right += right_drow
-            rows.append(row)
+        for left, right in zip(left_col, right_col):
+            row = [
+                slerp(x, left, right) for x in np.linspace(0, 1, ncols)
+            ]
+            rows.append(torch.from_numpy(np.vstack(row)))
         grid = torch.cat(rows, dim=0)
         return grid
 
@@ -170,6 +172,17 @@ class Trainer:
     @property
     def device(self):
         return self.args.device
+
+
+def slerp(val, low, high):
+    """
+    https://github.com/soumith/dcgan.torch/issues/14#issuecomment-200025792
+    """
+    omega = np.arccos(np.clip(np.dot(low/np.linalg.norm(low), high/np.linalg.norm(high)), -1, 1))
+    so = np.sin(omega)
+    if so == 0:
+        return (1.0-val) * low + val * high # L'Hopital's rule/LERP
+    return np.sin((1.0-val)*omega) / so * low + np.sin(val*omega) / so * high
 
 
 if __name__ == '__main__':
