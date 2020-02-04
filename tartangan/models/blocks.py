@@ -228,6 +228,7 @@ class DiscriminatorOutput(nn.Module):
         super().__init__()
         self.convs = nn.Sequential(
             norm_factory(in_dims),
+            nn.LeakyReLU(0.2),
             # nn.utils.spectral_norm(
                 nn.Conv2d(in_dims, out_dims, 1, padding=0, bias=True),
             # ),
@@ -246,6 +247,7 @@ class IQNDiscriminatorOutput(nn.Module):
         super().__init__()
         self.convs = nn.Sequential(
             norm_factory(in_dims),
+            nn.LeakyReLU(0.2),
             #nn.utils.spectral_norm(
                 nn.Conv2d(in_dims, out_dims, 1, padding=0, bias=True)
             #),
