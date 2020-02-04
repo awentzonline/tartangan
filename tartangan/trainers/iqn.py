@@ -16,6 +16,7 @@ from tartangan.models.blocks import (
     ResidualDiscriminatorBlock, ResidualGeneratorBlock,
     GeneratorInputMLP, TiledZGeneratorInput
 )
+from tartangan.models.layers import PixelNorm
 from tartangan.models.losses import (
     discriminator_hinge_loss, generator_hinge_loss, gradient_penalty
 )
@@ -28,10 +29,10 @@ class IQNTrainer(Trainer):
     def build_models(self):
         self.gan_config = GAN_CONFIGS[self.args.config]
         g_block_factory = functools.partial(
-            ResidualGeneratorBlock, #norm_factory=nn.Identity#nn.BatchNorm2d
+            ResidualGeneratorBlock, #norm_factory=nn.Identity#nn.BatchNorm2d#PixelNorm#
         )
         d_block_factory = functools.partial(
-            ResidualDiscriminatorBlock, #norm_factory=nn.Identity#nn.BatchNorm2d
+            ResidualDiscriminatorBlock, #norm_factory=nn.Identity#nn.BatchNorm2d#PixelNorm#
         )
         self.g = Generator(
             self.gan_config,
@@ -50,8 +51,8 @@ class IQNTrainer(Trainer):
             block_factory=d_block_factory,
             output_factory=IQNDiscriminatorOutput,
         ).to(self.device)
-        self.optimizer_g = torch.optim.Adam(self.g.parameters(), lr=self.args.lr_g)
-        self.optimizer_d = torch.optim.Adam(self.d.parameters(), lr=self.args.lr_d)
+        self.optimizer_g = torch.optim.Adam(self.g.parameters(), lr=self.args.lr_g, betas=(0., 0.999))
+        self.optimizer_d = torch.optim.Adam(self.d.parameters(), lr=self.args.lr_d, betas=(0., 0.999))
         print(self.g)
         print(self.d)
 

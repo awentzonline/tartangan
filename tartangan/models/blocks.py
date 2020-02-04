@@ -3,6 +3,7 @@ from torch import nn
 import torch.nn.functional as F
 
 from .iqn import IQN, iqn_loss
+from .layers import Interpolate, PixelNorm
 
 
 class GeneratorBlock(nn.Module):
@@ -23,7 +24,7 @@ class GeneratorBlock(nn.Module):
         if upsample:
             layers.insert(0, Interpolate(scale_factor=2, mode='bilinear', align_corners=True))
         self.convs = nn.Sequential(*layers)
-        map(nn.init.orthogonal_, self.parameters())
+        # map(nn.init.orthogonal_, self.parameters())
 
     def forward(self, x):
         return self.convs(x)
@@ -33,16 +34,20 @@ class ResidualGeneratorBlock(nn.Module):
     def __init__(self, in_dims, out_dims, upsample=True, norm_factory=nn.BatchNorm2d):
         super().__init__()
         layers = [
-            #nn.utils.spectral_norm(
+            norm_factory(in_dims),
+            nn.LeakyReLU(0.2),
+            # nn.utils.spectral_norm(
                 nn.Conv2d(in_dims, out_dims, 3, padding=1, bias=True),
-            #),
-            nn.LeakyReLU(0.2),
             norm_factory(out_dims),
-            #nn.utils.spectral_norm(
+            nn.LeakyReLU(0.2),
+            # nn.utils.spectral_norm(
                 nn.Conv2d(out_dims, out_dims, 3, padding=1, bias=True),
-            #),
-            nn.LeakyReLU(0.2),
-            norm_factory(out_dims),
+            # ),
+            # norm_factory(out_dims),
+            # nn.LeakyReLU(0.2),
+            # # nn.utils.spectral_norm(
+            #     nn.Conv2d(out_dims, out_dims, 1, bias=True),
+            # # ),
         ]
         self.upsample = upsample
         self.project_input = None
@@ -53,7 +58,7 @@ class ResidualGeneratorBlock(nn.Module):
                 #),
             )
         self.convs = nn.Sequential(*layers)
-        map(nn.init.orthogonal_, self.parameters())
+        # map(nn.init.orthogonal_, self.parameters())
 
     def forward(self, x):
         if self.upsample:
@@ -61,7 +66,7 @@ class ResidualGeneratorBlock(nn.Module):
         h = self.convs(x)
         if self.project_input is not None:
             x = self.project_input(x)
-        return F.relu(x + h)
+        return x + h
 
 
 class DiscriminatorBlock(nn.Module):
@@ -71,46 +76,47 @@ class DiscriminatorBlock(nn.Module):
             #nn.utils.spectral_norm(
                 nn.Conv2d(in_dims, out_dims, 3, padding=1, bias=True),
             #),
-            nn.LeakyReLU(0.2, inplace=True),
+            nn.LeakyReLU(0.2),
             norm_factory(out_dims),
             #nn.utils.spectral_norm(
                 nn.Conv2d(out_dims, out_dims, 3, padding=1, bias=True),
             #),
-            nn.LeakyReLU(0.2, inplace=True),
+            nn.LeakyReLU(0.2),
             norm_factory(out_dims),
             Interpolate(scale_factor=0.5, mode='bilinear', align_corners=True),
         ]
         self.convs = nn.Sequential(*layers)
-        map(nn.init.orthogonal_, self.parameters())
+        # map(nn.init.orthogonal_, self.parameters())
 
     def forward(self, x):
         return self.convs(x)
 
 
 class ResidualDiscriminatorBlock(nn.Module):
-    def __init__(self, in_dims, out_dims, first_conv=None, norm_factory=nn.BatchNorm2d):
+    def __init__(self, in_dims, out_dims, first_block=False, norm_factory=nn.BatchNorm2d):
         super().__init__()
         layers = [
-            #nn.utils.spectral_norm(
+            norm_factory(in_dims),
+            nn.LeakyReLU(0.2),
+            # nn.utils.spectral_norm(
                 nn.Conv2d(in_dims, out_dims, 3, padding=1, bias=True),
-            #),
-            nn.LeakyReLU(0.2, inplace=True),
+            # ),
             norm_factory(out_dims),
-            #nn.utils.spectral_norm(
+            nn.LeakyReLU(0.2),
+            # nn.utils.spectral_norm(
                 nn.Conv2d(out_dims, out_dims, 3, padding=1, bias=True),
-            #),
-            norm_factory(out_dims),
-            #nn.LeakyReLU(0.2, inplace=True),
+            # ),
             Interpolate(scale_factor=0.5, mode='bilinear', align_corners=True),
         ]
-        self.no_skip = bool(first_conv)
+        if first_block:
+            layers = layers[2:]
         self.convs = nn.Sequential(*layers)
         self.in_dims = in_dims
         self.out_dims = out_dims
         self.project_input = None
         if in_dims != out_dims:
             self.project_input = self._project_input
-        map(nn.init.orthogonal_, self.parameters())
+        # map(nn.init.orthogonal_, self.parameters())
 
     def _project_input(self, x):
         new_shape = list(x.shape)
@@ -121,12 +127,10 @@ class ResidualDiscriminatorBlock(nn.Module):
 
     def forward(self, x):
         h = self.convs(x)
-        # if self.no_skip:
-        #     return h
         x = F.interpolate(x, scale_factor=0.5, mode='bilinear', align_corners=True)
         if self.project_input is not None:
             x = self.project_input(x)
-        return F.leaky_relu(x + h, 0.2)
+        return x + h
 
 
 class GeneratorInputMLP(nn.Module):
@@ -183,27 +187,25 @@ class WeightedComponents(nn.Module):
     def forward(self, z):
         weights = self.img_weights(z)[..., None, None]
         weighted = self.components * weights
+        # return self.output_norm(F.selu(weighted))
         return self.output_norm(F.leaky_relu(weighted, 0.2))
 
 
 class GeneratorOutput(nn.Module):
-    def __init__(self, in_dims, out_dims):
+    def __init__(self, in_dims, out_dims, norm_factory=nn.BatchNorm2d):
         super().__init__()
         self.convs = nn.Sequential(
+            norm_factory(in_dims),
+            nn.LeakyReLU(0.2),
             #nn.utils.spectral_norm(
                 nn.Conv2d(in_dims, out_dims, 1, padding=0, bias=True),
             #),
             nn.Tanh()  # nn.Sigmoid()
         )
-        map(nn.init.orthogonal_, self.parameters())
+        # map(nn.init.orthogonal_, self.parameters())
 
     def forward(self, x):
         return self.convs(x)
-
-
-class SpineBlock(nn.Module):
-    def __init__(self, in_dims, out_dims):
-        pass
 
 
 class DiscriminatorInput(nn.Module):
@@ -213,25 +215,26 @@ class DiscriminatorInput(nn.Module):
             #nn.utils.spectral_norm(
                 nn.Conv2d(in_dims, out_dims, 1, padding=0, bias=True),
             #),
-            nn.LeakyReLU(0.2),
+            # nn.LeakyReLU(0.2),
         )
-        map(nn.init.orthogonal_, self.parameters())
+        # map(nn.init.orthogonal_, self.parameters())
 
     def forward(self, img):
         return self.convs(img)
 
 
 class DiscriminatorOutput(nn.Module):
-    def __init__(self, in_dims, out_dims):
+    def __init__(self, in_dims, out_dims, norm_factory=nn.BatchNorm2d):
         super().__init__()
         self.convs = nn.Sequential(
+            norm_factory(in_dims),
             # nn.utils.spectral_norm(
                 nn.Conv2d(in_dims, out_dims, 1, padding=0, bias=True),
             # ),
             # nn.Tanh()
             nn.Sigmoid()
         )
-        map(nn.init.orthogonal_, self.parameters())
+        # map(nn.init.orthogonal_, self.parameters())
 
     def forward(self, img):
         feats = self.convs(img)
@@ -239,15 +242,16 @@ class DiscriminatorOutput(nn.Module):
 
 
 class IQNDiscriminatorOutput(nn.Module):
-    def __init__(self, in_dims, out_dims):
+    def __init__(self, in_dims, out_dims, norm_factory=nn.BatchNorm2d):
         super().__init__()
         self.convs = nn.Sequential(
+            norm_factory(in_dims),
             #nn.utils.spectral_norm(
                 nn.Conv2d(in_dims, out_dims, 1, padding=0, bias=True)
             #),
             #nn.Tanh()#Sigmoid()
         )
-        map(nn.init.orthogonal_, self.parameters())
+        # map(nn.init.orthogonal_, self.parameters())
         # avoid ortho init for IQN
         feats_dims = 4 * 4 * in_dims
         self.iqn = IQN(feats_dims)
@@ -269,22 +273,3 @@ class IQNDiscriminatorOutput(nn.Module):
         if targets is not None:
             return p_target, loss
         return p_target
-
-
-class Interpolate(nn.Module):
-    def __init__(self, *args, **kwargs):
-        super().__init__()
-        self.args = args
-        self.kwargs = kwargs
-
-    def forward(self, x):
-        return F.interpolate(x, *self.args, **self.kwargs)
-
-
-class PixelNorm(nn.Module):
-    def __init__(self, eps=1e-8):
-        super().__init__()
-        self.eps = eps
-
-    def forward(self, x):
-        return x / torch.sqrt((x ** 2).mean(1, keepdim=True) + self.eps)

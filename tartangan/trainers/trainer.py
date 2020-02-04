@@ -141,7 +141,9 @@ class Trainer:
             )
 
     def sample_latent_grid(self, nrows, ncols):
-        top_left, top_right, bottom_left, bottom_right = self.sample_z(4)
+        top_left, top_right, bottom_left, bottom_right = map(
+            lambda x: x.cpu(), self.sample_z(4)
+        )
         left_col = [
             slerp(x, top_left, bottom_left) for x in np.linspace(0, 1, nrows)
         ]
@@ -154,7 +156,7 @@ class Trainer:
                 slerp(x, left, right) for x in np.linspace(0, 1, ncols)
             ]
             rows.append(torch.from_numpy(np.vstack(row)))
-        grid = torch.cat(rows, dim=0)
+        grid = torch.cat(rows, dim=0).to(self.device)
         return grid
 
     def save_checkpoint(self, filename):

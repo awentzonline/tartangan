@@ -14,7 +14,10 @@ from .blocks import (
 )
 
 
-GANConfig = namedtuple('GANConfig', 'base_size, latent_dims, data_dims, blocks')
+GANConfig = namedtuple(
+    'GANConfig',
+    'base_size, latent_dims, data_dims, blocks, num_blocks_per_scale'
+)
 
 
 class BlockModel(nn.Module):
@@ -36,7 +39,6 @@ class BlockModel(nn.Module):
 
     def forward(self, x):
         return reduce(lambda f, b: b(f), self.blocks, x)
-        return self.blocks(x)
 
     @property
     def max_size(self):
@@ -55,9 +57,12 @@ class Generator(BlockModel):
             self.input_factory(self.config.latent_dims, self.config.base_size)
         ]
         in_dims = self.config.latent_dims
+        num_blocks_per_scale = 2
         for out_dims in self.config.blocks:
-            block = self.block_factory(in_dims, out_dims)
-            blocks.append(block)
+            scale_blocks = [self.block_factory(in_dims, out_dims)]
+            for i in range(num_blocks_per_scale - 1):
+                scale_blocks.append(self.block_factory(out_dims, out_dims, upsample=False))
+            blocks += scale_blocks
             in_dims = out_dims
         blocks.append(
             self.output_factory(out_dims, self.config.data_dims)
@@ -72,8 +77,11 @@ class Discriminator(BlockModel):
     default_output = DiscriminatorOutput
 
     def build(self):
-        blocks = []
-        in_dims = self.config.data_dims
+        first_block_input_dims = next(reversed(self.config.blocks))
+        blocks = [
+            self.input_factory(self.config.data_dims, first_block_input_dims),
+        ]
+        in_dims = first_block_input_dims
         for out_dims in reversed(self.config.blocks):
             block = self.block_factory(in_dims, out_dims)
             blocks.append(block)
@@ -109,6 +117,7 @@ GAN_CONFIGS = {
         base_size=4,
         data_dims=3,
         latent_dims=100,
+        num_blocks_per_scale=1,
         blocks=(
             64,  # 8,
             32,  # 16,
@@ -118,6 +127,7 @@ GAN_CONFIGS = {
         base_size=4,
         data_dims=3,
         latent_dims=128,
+        num_blocks_per_scale=1,
         blocks=(
             128,  # 8,
             64,  # 16,
@@ -128,6 +138,7 @@ GAN_CONFIGS = {
         base_size=4,
         data_dims=3,
         latent_dims=128,
+        num_blocks_per_scale=1,
         blocks=(
             128,  # 8,
             128,  # 16,
@@ -139,6 +150,7 @@ GAN_CONFIGS = {
         base_size=4,
         data_dims=3,
         latent_dims=128,
+        num_blocks_per_scale=1,
         blocks=(
             128,  # 8,
             128,  # 16,
@@ -151,6 +163,7 @@ GAN_CONFIGS = {
         base_size=4,
         data_dims=3,
         latent_dims=256,
+        num_blocks_per_scale=1,
         blocks=(
             256,  # 8,
             256,  # 16,
@@ -164,6 +177,7 @@ GAN_CONFIGS = {
         base_size=4,
         data_dims=3,
         latent_dims=256,
+        num_blocks_per_scale=1,
         blocks=(
             256,  # 8
             256,  # 16
@@ -178,6 +192,7 @@ GAN_CONFIGS = {
         base_size=4,
         data_dims=3,
         latent_dims=128,
+        num_blocks_per_scale=1,
         blocks=(
             128,  # 8,
             128,  # 16,
@@ -193,6 +208,7 @@ GAN_CONFIGS = {
         base_size=4,
         data_dims=3,
         latent_dims=128,
+        num_blocks_per_scale=1,
         blocks=(
             128,  # 8,
             120,  # 16,
@@ -207,6 +223,7 @@ GAN_CONFIGS = {
         base_size=4,
         data_dims=3,
         latent_dims=512,
+        num_blocks_per_scale=1,
         blocks=(
             512,  # 8,
             512,  # 16,
@@ -222,6 +239,7 @@ GAN_CONFIGS = {
         base_size=4,
         data_dims=3,
         latent_dims=256,
+        num_blocks_per_scale=1,
         blocks=(
             256,  # 8,
             256,  # 16,
@@ -237,6 +255,7 @@ GAN_CONFIGS = {
         base_size=4,
         data_dims=3,
         latent_dims=64,
+        num_blocks_per_scale=1,
         blocks=(
             64,  # 8,
             32,  # 16,
@@ -249,6 +268,7 @@ GAN_CONFIGS = {
         base_size=4,
         data_dims=3,
         latent_dims=256,
+        num_blocks_per_scale=1,
         blocks=(
             200,  # 8,
             180,  # 16,

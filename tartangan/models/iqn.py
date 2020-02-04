@@ -23,11 +23,37 @@ class QuantileEmbedding(nn.Module):
         return self.to_state(qs)
 
 
-class IQN(nn.Module):
-    def __init__(self, feature_dims, quantile_dims=64, num_quantiles=8, mix='mult',
-                 norm_factory=nn.BatchNorm1d):#nn.Identity):#
+class WeightedQuantileEmbedding(nn.Module):
+    def __init__(self, state_dims, embedding_dims=20, **_):
         super().__init__()
-        self.quantile_embedding = QuantileEmbedding(
+        self.quantile_embeddings = nn.Embedding(
+            embedding_dims, state_dims
+        )
+        self.quantile_indexes = nn.Parameter(
+            torch.linspace(0, 1, embedding_dims), requires_grad=False
+        )
+        self.embedding_dims = embedding_dims
+
+    def forward(self, quantiles):
+        """quantiles.shape == (batch, 1)"""
+        quantile_weights = (quantiles - self.quantile_indexes).abs()
+        quantile_weights = 1. / (quantile_weights + 1e-8)
+        quantile_weights = quantile_weights / quantile_weights.sum(-1, keepdim=True)
+        weighted_embeddings = torch.mm(
+            quantile_weights,
+            self.quantile_embeddings.weight
+        )
+        return weighted_embeddings
+
+
+class IQN(nn.Module):
+    def __init__(
+        self, feature_dims, quantile_dims=20, num_quantiles=8, mix='mult',
+        quantile_embedding_factory=WeightedQuantileEmbedding,
+        norm_factory=nn.BatchNorm1d#nn.Identity#
+    ):
+        super().__init__()
+        self.quantile_embedding = quantile_embedding_factory(
             feature_dims, quantile_dims, norm_factory=norm_factory
         )
         self.feature_dims = feature_dims

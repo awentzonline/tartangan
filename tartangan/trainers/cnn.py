@@ -28,10 +28,10 @@ class CNNTrainer(Trainer):
     def build_models(self):
         self.gan_config = GAN_CONFIGS[self.args.config]
         g_block_factory = functools.partial(
-            ResidualGeneratorBlock, #norm_factory=nn.Identity#nn.BatchNorm2d#nn.InstanceNorm2d#
+            ResidualGeneratorBlock, #norm_factory=nn.Identity#nn.InstanceNorm2d#
         )
         d_block_factory = functools.partial(
-            ResidualDiscriminatorBlock, #norm_factory=nn.Identity#nn.BatchNorm2d#nn.InstanceNorm2d#
+            ResidualDiscriminatorBlock, #norm_factory=nn.Identity#nn.InstanceNorm2d#
         )
         self.g = Generator(
             self.gan_config,
@@ -49,8 +49,8 @@ class CNNTrainer(Trainer):
             self.gan_config,
             block_factory=d_block_factory
         ).to(self.device)
-        self.optimizer_g = torch.optim.Adam(self.g.parameters(), lr=self.args.lr_g)
-        self.optimizer_d = torch.optim.Adam(self.d.parameters(), lr=self.args.lr_d)
+        self.optimizer_g = torch.optim.Adam(self.g.parameters(), lr=self.args.lr_g, betas=(0., 0.999))
+        self.optimizer_d = torch.optim.Adam(self.d.parameters(), lr=self.args.lr_d, betas=(0., 0.999))
         self.d_loss = discriminator_hinge_loss
         self.g_loss = generator_hinge_loss
         self.bce_loss = nn.BCELoss()
