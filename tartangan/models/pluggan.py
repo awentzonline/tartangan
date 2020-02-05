@@ -14,10 +14,18 @@ from .blocks import (
 )
 
 
-GANConfig = namedtuple(
-    'GANConfig',
-    'base_size, latent_dims, data_dims, blocks, num_blocks_per_scale'
-)
+class GANConfig(
+    namedtuple(
+        'GANConfig',
+        'base_size, latent_dims, data_dims, blocks, num_blocks_per_scale'
+    )
+):
+    def scale_model(self, scale):
+        scaled = list(map(lambda x: int(x * scale), self.blocks))
+        kwargs = self._asdict()
+        kwargs['blocks'] = scaled
+        return self.__class__(**kwargs)
+
 
 
 class BlockModel(nn.Module):

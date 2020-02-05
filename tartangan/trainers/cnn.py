@@ -27,6 +27,7 @@ from .trainer import Trainer
 class CNNTrainer(Trainer):
     def build_models(self):
         self.gan_config = GAN_CONFIGS[self.args.config]
+        self.gan_config = self.gan_config.scale_model(self.args.model_scale)
         g_block_factory = functools.partial(
             ResidualGeneratorBlock, #norm_factory=nn.Identity#nn.InstanceNorm2d#
         )
@@ -139,6 +140,7 @@ if __name__ == '__main__':
     p.add_argument('--dataset-cache', default='cache/{root}_{size}.pkl')
     p.add_argument('--grad-penalty', type=float, default=5.)
     p.add_argument('--config', default='64')
+    p.add_argument('--model-scale', type=float, default=1.)
     args = p.parse_args()
 
     trainer = CNNTrainer(args)

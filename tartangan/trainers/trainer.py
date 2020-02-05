@@ -205,6 +205,7 @@ if __name__ == '__main__':
     p.add_argument('--checkpoint', default='checkpoint/tartangan')
     p.add_argument('--dataset-cache', default='cache/{root}_{size}.pkl')
     p.add_argument('--grad-penalty', type=float, default=5.)
+    p.add_argument('--model-scale', type=float, default=1.)
     args = p.parse_args()
 
     trainer = CNNTrainer(args)
