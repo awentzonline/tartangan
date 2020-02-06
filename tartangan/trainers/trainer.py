@@ -59,7 +59,7 @@ class Trainer:
                     self.output_samples(f'{self.args.sample_file}_{steps}.png')
                 if steps % self.args.checkpoint_freq == 0:
                     self.save_checkpoint(f'{self.args.checkpoint}_{steps}')
-            if epoch_i == 0:
+            if epoch_i == 0 and self.args.cache_dataset:
                 self.dataset.save_cache(self.dataset_cache_path(img_size))
 
     def dataset_cache_path(self, size):
@@ -206,6 +206,7 @@ if __name__ == '__main__':
     p.add_argument('--dataset-cache', default='cache/{root}_{size}.pkl')
     p.add_argument('--grad-penalty', type=float, default=5.)
     p.add_argument('--model-scale', type=float, default=1.)
+    p.add_argument('--cache-dataset', action='store_true')
     args = p.parse_args()
 
     trainer = CNNTrainer(args)

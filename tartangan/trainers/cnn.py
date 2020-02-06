@@ -141,6 +141,7 @@ if __name__ == '__main__':
     p.add_argument('--grad-penalty', type=float, default=5.)
     p.add_argument('--config', default='64')
     p.add_argument('--model-scale', type=float, default=1.)
+    p.add_argument('--cache-dataset', action='store_true')
     args = p.parse_args()
 
     trainer = CNNTrainer(args)

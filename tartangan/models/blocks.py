@@ -7,20 +7,19 @@ from .layers import Interpolate, PixelNorm
 
 
 class GeneratorBlock(nn.Module):
-    def __init__(self, in_dims, out_dims, upsample=True, norm_factory=nn.BatchNorm2d):
+    def __init__(self, in_dims, out_dims, upsample=True, first_block=False,
+                 norm_factory=nn.BatchNorm2d, activation_factory=nn.ReLU):
         super().__init__()
         layers = [
-            # nn.utils.spectral_norm(
-                nn.Conv2d(in_dims, out_dims, 3, padding=1, bias=True),
-            # ),
-            nn.LeakyReLU(0.2),
             norm_factory(out_dims),
-            # nn.utils.spectral_norm(
-                nn.Conv2d(out_dims, out_dims, 3, padding=1, bias=True),
-            # ),
-            nn.LeakyReLU(0.2),
+            activation_factory(),
+            nn.Conv2d(in_dims, out_dims, 3, padding=1, bias=True),
             norm_factory(out_dims),
+            activation_factory(),
+            nn.Conv2d(out_dims, out_dims, 3, padding=1, bias=True),
         ]
+        if first_block:
+            layers = layers[2:]
         if upsample:
             layers.insert(0, Interpolate(scale_factor=2, mode='bilinear', align_corners=True))
         self.convs = nn.Sequential(*layers)
@@ -31,31 +30,25 @@ class GeneratorBlock(nn.Module):
 
 
 class ResidualGeneratorBlock(nn.Module):
-    def __init__(self, in_dims, out_dims, upsample=True, norm_factory=nn.BatchNorm2d):
+    def __init__(self, in_dims, out_dims, upsample=True, first_block=False,
+                 norm_factory=nn.BatchNorm2d, activation_factory=nn.ReLU):
         super().__init__()
+
         layers = [
             norm_factory(in_dims),
-            nn.LeakyReLU(0.2),
-            # nn.utils.spectral_norm(
-                nn.Conv2d(in_dims, out_dims, 3, padding=1, bias=True),
+            activation_factory(),
+            nn.Conv2d(in_dims, out_dims, 3, padding=1),
             norm_factory(out_dims),
-            nn.LeakyReLU(0.2),
-            # nn.utils.spectral_norm(
-                nn.Conv2d(out_dims, out_dims, 3, padding=1, bias=True),
-            # ),
-            # norm_factory(out_dims),
-            # nn.LeakyReLU(0.2),
-            # # nn.utils.spectral_norm(
-            #     nn.Conv2d(out_dims, out_dims, 1, bias=True),
-            # # ),
+            activation_factory(),
+            nn.Conv2d(out_dims, out_dims, 3, padding=1),
         ]
+        if first_block:
+            layers = layers[2:]
         self.upsample = upsample
         self.project_input = None
         if in_dims != out_dims:
             self.project_input = nn.Sequential(
-                #nn.utils.spectral_norm(
-                    nn.Conv2d(in_dims, out_dims, 1)
-                #),
+                nn.Conv2d(in_dims, out_dims, 1)
             )
         self.convs = nn.Sequential(*layers)
         # map(nn.init.orthogonal_, self.parameters())
@@ -70,21 +63,19 @@ class ResidualGeneratorBlock(nn.Module):
 
 
 class DiscriminatorBlock(nn.Module):
-    def __init__(self, in_dims, out_dims, first_conv=None, norm_factory=nn.BatchNorm2d):
+    def __init__(self, in_dims, out_dims, first_block=False, norm_factory=nn.BatchNorm2d):
         super().__init__()
         layers = [
-            #nn.utils.spectral_norm(
-                nn.Conv2d(in_dims, out_dims, 3, padding=1, bias=True),
-            #),
-            nn.LeakyReLU(0.2),
             norm_factory(out_dims),
-            #nn.utils.spectral_norm(
-                nn.Conv2d(out_dims, out_dims, 3, padding=1, bias=True),
-            #),
             nn.LeakyReLU(0.2),
+            nn.Conv2d(in_dims, out_dims, 3, padding=1, bias=True),
             norm_factory(out_dims),
+            nn.LeakyReLU(0.2),
+            nn.Conv2d(out_dims, out_dims, 3, padding=1, bias=True),
             Interpolate(scale_factor=0.5, mode='bilinear', align_corners=True),
         ]
+        if first_block:
+            layers = layers[2:]
         self.convs = nn.Sequential(*layers)
         # map(nn.init.orthogonal_, self.parameters())
 
@@ -98,14 +89,10 @@ class ResidualDiscriminatorBlock(nn.Module):
         layers = [
             norm_factory(in_dims),
             nn.LeakyReLU(0.2),
-            # nn.utils.spectral_norm(
-                nn.Conv2d(in_dims, out_dims, 3, padding=1, bias=True),
-            # ),
+            nn.Conv2d(in_dims, out_dims, 3, padding=1, bias=True),
             norm_factory(out_dims),
             nn.LeakyReLU(0.2),
-            # nn.utils.spectral_norm(
-                nn.Conv2d(out_dims, out_dims, 3, padding=1, bias=True),
-            # ),
+            nn.Conv2d(out_dims, out_dims, 3, padding=1, bias=True),
             Interpolate(scale_factor=0.5, mode='bilinear', align_corners=True),
         ]
         if first_block:
@@ -115,7 +102,10 @@ class ResidualDiscriminatorBlock(nn.Module):
         self.out_dims = out_dims
         self.project_input = None
         if in_dims != out_dims:
-            self.project_input = self._project_input
+            # self.project_input = self._project_input
+            self.project_input = nn.Sequential(
+                nn.Conv2d(in_dims, out_dims, 1)
+            )
         # map(nn.init.orthogonal_, self.parameters())
 
     def _project_input(self, x):
@@ -138,11 +128,8 @@ class GeneratorInputMLP(nn.Module):
         super().__init__()
         base_img_dims = size ** 2 * latent_dims
         self.base_img = nn.Sequential(
-            #nn.utils.spectral_norm(
-                nn.Linear(latent_dims, base_img_dims),
-            #),
+            nn.Linear(latent_dims, base_img_dims),
             nn.ReLU(),
-            norm_factory(base_img_dims),
         )
         self.latent_dims = latent_dims
         self.size = size
@@ -164,43 +151,15 @@ class TiledZGeneratorInput(nn.Module):
         return components
 
 
-class WeightedComponents(nn.Module):
-    def __init__(self, latent_dims, size=4, num_components=None, norm_factory=nn.BatchNorm2d):
-        super().__init__()
-        num_components = latent_dims if num_components is None else num_components
-        self.components = nn.Parameter(
-            torch.randn(1, num_components, size, size, requires_grad=True) * 0.1
-            , requires_grad=True
-        )
-        self.img_weights = nn.Sequential(
-            # nn.utils.spectral_norm(
-                 nn.Linear(latent_dims, num_components),
-            # ),
-            # nn.LeakyReLU(0.2),
-            #nn.utils.spectral_norm(
-            #    nn.Linear(num_components, num_components),
-            #),
-            #nn.Sigmoid(),
-        )
-        self.output_norm = norm_factory(latent_dims)
-
-    def forward(self, z):
-        weights = self.img_weights(z)[..., None, None]
-        weighted = self.components * weights
-        # return self.output_norm(F.selu(weighted))
-        return self.output_norm(F.leaky_relu(weighted, 0.2))
-
-
 class GeneratorOutput(nn.Module):
-    def __init__(self, in_dims, out_dims, norm_factory=nn.BatchNorm2d):
+    def __init__(self, in_dims, out_dims, norm_factory=nn.BatchNorm2d,
+                 activation_factory=nn.ReLU):
         super().__init__()
         self.convs = nn.Sequential(
             norm_factory(in_dims),
-            nn.LeakyReLU(0.2),
-            #nn.utils.spectral_norm(
-                nn.Conv2d(in_dims, out_dims, 1, padding=0, bias=True),
-            #),
-            nn.Tanh()  # nn.Sigmoid()
+            activation_factory(),
+            nn.Conv2d(in_dims, out_dims, 1, padding=0, bias=True),
+            nn.Tanh()
         )
         # map(nn.init.orthogonal_, self.parameters())
 
@@ -212,9 +171,7 @@ class DiscriminatorInput(nn.Module):
     def __init__(self, in_dims, out_dims):
         super().__init__()
         self.convs = nn.Sequential(
-            #nn.utils.spectral_norm(
-                nn.Conv2d(in_dims, out_dims, 1, padding=0, bias=True),
-            #),
+            nn.Conv2d(in_dims, out_dims, 1, padding=0, bias=True),
             # nn.LeakyReLU(0.2),
         )
         # map(nn.init.orthogonal_, self.parameters())
@@ -229,10 +186,7 @@ class DiscriminatorOutput(nn.Module):
         self.convs = nn.Sequential(
             norm_factory(in_dims),
             nn.LeakyReLU(0.2),
-            # nn.utils.spectral_norm(
-                nn.Conv2d(in_dims, out_dims, 1, padding=0, bias=True),
-            # ),
-            # nn.Tanh()
+            nn.Conv2d(in_dims, out_dims, 1, padding=0, bias=True),
             nn.Sigmoid()
         )
         # map(nn.init.orthogonal_, self.parameters())
@@ -248,10 +202,8 @@ class IQNDiscriminatorOutput(nn.Module):
         self.convs = nn.Sequential(
             norm_factory(in_dims),
             nn.LeakyReLU(0.2),
-            #nn.utils.spectral_norm(
-                nn.Conv2d(in_dims, out_dims, 1, padding=0, bias=True)
-            #),
-            #nn.Tanh()#Sigmoid()
+            nn.Conv2d(in_dims, out_dims, 1, padding=0, bias=True)
+            # nn.Sigmoid()
         )
         # map(nn.init.orthogonal_, self.parameters())
         # avoid ortho init for IQN
@@ -275,3 +227,37 @@ class IQNDiscriminatorOutput(nn.Module):
         if targets is not None:
             return p_target, loss
         return p_target
+
+
+class SelfAttention2d(nn.Module):
+    def __init__(self, in_dims, attention_dims=None):
+        super().__init__()
+        if attention_dims is None:
+            self.attention_dims = attention_dims = in_dims // 8
+        self.query = nn.Sequential(
+            nn.Conv2d(in_dims, attention_dims, 1, padding=0),
+        )
+        self.key = nn.Sequential(
+            nn.Conv2d(in_dims, attention_dims, 1, padding=0),
+        )
+        self.value = nn.Sequential(
+            nn.Conv2d(in_dims, in_dims, 1, padding=0),
+        )
+        self.gamma = nn.Parameter(
+            torch.zeros(1), requires_grad=True
+        )
+
+    def forward(self, x):
+        batch, channels, height, width = x.shape
+        q = self.query(x)
+        k = self.key(x)
+        v = self.value(x)
+        q = q.view(batch, self.attention_dims, -1)
+        k = k.view(batch, self.attention_dims, -1)
+        v = v.view(batch, channels, -1)
+        q = q.permute((0, 2, 1))
+        attention = torch.matmul(q, k)
+        attention = F.softmax(attention, dim=1)
+        attended = torch.matmul(v, attention)
+        attended = attended.view(batch, channels, height, width)
+        return self.gamma * attended + x

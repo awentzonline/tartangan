@@ -10,14 +10,14 @@ from .blocks import (
     DiscriminatorBlock, DiscriminatorOutput, DiscriminatorInput,
     GeneratorBlock, GeneratorInputMLP, GeneratorOutput,
     ResidualDiscriminatorBlock, ResidualGeneratorBlock,
-    TiledZGeneratorInput, WeightedComponents
+    SelfAttention2d, TiledZGeneratorInput
 )
 
 
 class GANConfig(
     namedtuple(
         'GANConfig',
-        'base_size, latent_dims, data_dims, blocks, num_blocks_per_scale'
+        'base_size, latent_dims, data_dims, blocks, num_blocks_per_scale, attention'
     )
 ):
     def scale_model(self, scale):
@@ -64,11 +64,15 @@ class Generator(BlockModel):
             self.input_factory(self.config.latent_dims, self.config.base_size)
         ]
         in_dims = self.config.latent_dims
-        num_blocks_per_scale = 2
-        for out_dims in self.config.blocks:
-            scale_blocks = [self.block_factory(in_dims, out_dims)]
+        num_blocks_per_scale = self.config.num_blocks_per_scale
+        first_block = True
+        for block_i, out_dims in enumerate(self.config.blocks):
+            scale_blocks = [self.block_factory(in_dims, out_dims, first_block=first_block)]
+            first_block = False
             for i in range(num_blocks_per_scale - 1):
                 scale_blocks.append(self.block_factory(out_dims, out_dims, upsample=False))
+            if self.config.attention and block_i in self.config.attention:
+                scale_blocks.append(SelfAttention2d(out_dims))
             blocks += scale_blocks
             in_dims = out_dims
         blocks.append(
@@ -89,10 +93,14 @@ class Discriminator(BlockModel):
             self.input_factory(self.config.data_dims, first_block_input_dims),
         ]
         in_dims = first_block_input_dims
-        for out_dims in reversed(self.config.blocks):
-            block = self.block_factory(in_dims, out_dims)
+        first_block = True
+        for block_i, out_dims in reversed(list(enumerate(self.config.blocks))):
+            block = self.block_factory(in_dims, out_dims, first_block=first_block)
             blocks.append(block)
+            if self.config.attention and block_i in self.config.attention:
+                blocks.append(SelfAttention2d(out_dims))
             in_dims = out_dims
+            first_block = False
         blocks.append(
             self.output_factory(out_dims, 1)
         )
@@ -124,6 +132,7 @@ GAN_CONFIGS = {
         base_size=4,
         data_dims=3,
         latent_dims=100,
+        attention=(1,),
         num_blocks_per_scale=1,
         blocks=(
             64,  # 8,
@@ -134,6 +143,7 @@ GAN_CONFIGS = {
         base_size=4,
         data_dims=3,
         latent_dims=128,
+        attention=(1,),
         num_blocks_per_scale=1,
         blocks=(
             128,  # 8,
@@ -145,6 +155,7 @@ GAN_CONFIGS = {
         base_size=4,
         data_dims=3,
         latent_dims=128,
+        attention=(2,),
         num_blocks_per_scale=1,
         blocks=(
             128,  # 8,
@@ -157,6 +168,7 @@ GAN_CONFIGS = {
         base_size=4,
         data_dims=3,
         latent_dims=256,
+        attention=(2,),
         num_blocks_per_scale=1,
         blocks=(
             128,  # 8,
@@ -170,6 +182,7 @@ GAN_CONFIGS = {
         base_size=4,
         data_dims=3,
         latent_dims=256,
+        attention=(3,),
         num_blocks_per_scale=1,
         blocks=(
             256,  # 8,
@@ -184,6 +197,7 @@ GAN_CONFIGS = {
         base_size=4,
         data_dims=3,
         latent_dims=512,
+        attention=(3,),
         num_blocks_per_scale=1,
         blocks=(
             256,  # 8
@@ -199,6 +213,7 @@ GAN_CONFIGS = {
         base_size=4,
         data_dims=3,
         latent_dims=256,
+        attention=(3,),
         num_blocks_per_scale=1,
         blocks=(
             128,  # 8,
@@ -215,6 +230,7 @@ GAN_CONFIGS = {
         base_size=4,
         data_dims=3,
         latent_dims=128,
+        attention=(3,),
         num_blocks_per_scale=1,
         blocks=(
             128,  # 8,
@@ -230,6 +246,7 @@ GAN_CONFIGS = {
         base_size=4,
         data_dims=3,
         latent_dims=512,
+        attention=(3,),
         num_blocks_per_scale=1,
         blocks=(
             512,  # 8,
@@ -246,6 +263,7 @@ GAN_CONFIGS = {
         base_size=4,
         data_dims=3,
         latent_dims=256,
+        attention=(3,),
         num_blocks_per_scale=1,
         blocks=(
             256,  # 8,
@@ -262,6 +280,7 @@ GAN_CONFIGS = {
         base_size=4,
         data_dims=3,
         latent_dims=64,
+        attention=(3,),
         num_blocks_per_scale=1,
         blocks=(
             64,  # 8,
@@ -275,6 +294,7 @@ GAN_CONFIGS = {
         base_size=4,
         data_dims=3,
         latent_dims=256,
+        attention=(3,),
         num_blocks_per_scale=1,
         blocks=(
             200,  # 8,
