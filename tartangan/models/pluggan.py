@@ -27,7 +27,6 @@ class GANConfig(
         return self.__class__(**kwargs)
 
 
-
 class BlockModel(nn.Module):
     def __init__(
         self, config,
@@ -157,7 +156,7 @@ GAN_CONFIGS = {
     '128': GANConfig(
         base_size=4,
         data_dims=3,
-        latent_dims=128,
+        latent_dims=256,
         num_blocks_per_scale=1,
         blocks=(
             128,  # 8,
@@ -184,7 +183,7 @@ GAN_CONFIGS = {
     '512': GANConfig(
         base_size=4,
         data_dims=3,
-        latent_dims=256,
+        latent_dims=512,
         num_blocks_per_scale=1,
         blocks=(
             256,  # 8
@@ -199,7 +198,7 @@ GAN_CONFIGS = {
     '512thin': GANConfig(
         base_size=4,
         data_dims=3,
-        latent_dims=128,
+        latent_dims=256,
         num_blocks_per_scale=1,
         blocks=(
             128,  # 8,
