@@ -8,14 +8,14 @@ def read(fname):
 
 setup(
     name="tartangan",
-    version="0.0.1",
+    version="0.0.2",
     author="Adam Wentz",
     author_email="adam@adamwentz.com",
     description="Model tartan patterns with a GAN.",
     long_description=read("README.md"),
     license="MIT",
     url="https://github.com/awentzonline/tartangan",
-    packages=["tartangan"],
+    packages=find_packages(),
     entry_points={
         "console_scripts": [
             "tartangan_scrape = tartangan.scraper:main",
