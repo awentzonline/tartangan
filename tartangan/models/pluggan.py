@@ -114,9 +114,11 @@ class IQNDiscriminator(Discriminator):
     def build(self):
         blocks = []
         in_dims = self.config.data_dims
-        for out_dims in reversed(self.config.blocks):
+        for block_i, out_dims in reversed(list(enumerate(self.config.blocks))):
             block = self.block_factory(in_dims, out_dims)
             blocks.append(block)
+            if self.config.attention and block_i in self.config.attention:
+                blocks.append(SelfAttention2d(out_dims))
             in_dims = out_dims
         self.to_output = self.output_factory(out_dims, 1)
         self.blocks = nn.Sequential(*blocks)

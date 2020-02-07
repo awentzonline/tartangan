@@ -120,7 +120,7 @@ if __name__ == '__main__':
     p.add_argument('--gen-freq', type=int, default=200)
     p.add_argument('--lr-g', type=float, default=1e-4)
     p.add_argument('--lr-d', type=float, default=4e-4)
-    p.add_argument('--lr-target-g', type=float, default=1e-2)
+    p.add_argument('--lr-target-g', type=float, default=1e-3)
     p.add_argument('--device', default='cpu')
     p.add_argument('--epochs', type=int, default=10000)
     p.add_argument('--sample-file', default='sample/tartangan')
