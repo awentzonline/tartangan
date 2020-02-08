@@ -10,3 +10,4 @@ checkpoint/
 *.onnx
 *.pt
 *.log
+.DS_Store

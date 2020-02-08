@@ -28,10 +28,12 @@ class ImageBytesDataset(Dataset):
         return self.images.shape[0]
 
     @classmethod
-    def prepare_data_from_path(cls, path, transform=None):
+    def prepare_data_from_path(cls, path, transform=None, trunc=None):
         image_filenames = list_files_recursive(path, IMG_EXTENSIONS)
+        if trunc is not None:
+            image_filenames = image_filenames[:trunc]
         images = []
-        for filename in tqdm.tqdm(image_filenames[:100]):
+        for filename in tqdm.tqdm(image_filenames):
             img = default_loader(filename)
             if transform is not None:
                 img = transform(img)
@@ -65,6 +67,7 @@ if __name__ == '__main__':
     p.add_argument('source', help='Root path of images')
     p.add_argument('destination', help='Output location of dataset')
     p.add_argument('--resize', help='Width/height of saved images', default=64, type=int)
+    p.add_argument('--trunc', default=None, type=int, help='Take only first N samples')
     args = p.parse_args()
 
     transform = transforms.Compose([
@@ -72,5 +75,7 @@ if __name__ == '__main__':
             (args.resize, args.resize), interpolation=Image.LANCZOS
         ),
     ])
-    data = ImageBytesDataset.prepare_data_from_path(args.source, transform=transform)
+    data = ImageBytesDataset.prepare_data_from_path(
+        args.source, transform=transform, trunc=args.trunc
+    )
     np.save(args.destination, data)
