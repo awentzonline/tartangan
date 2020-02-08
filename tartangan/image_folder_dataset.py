@@ -7,7 +7,7 @@ from torchvision.datasets.utils import list_files
 from torchvision import transforms
 
 
-class JustImagesDataset(VisionDataset):
+class ImageFolderDataset(VisionDataset):
     """Just batches of some images from a folder."""
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

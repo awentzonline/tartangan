@@ -12,7 +12,8 @@ import torchvision
 from torchvision import transforms
 import tqdm
 
-from tartangan.image_dataset import JustImagesDataset
+from tartangan.image_bytes_dataset import ImageBytesDataset
+from tartangan.image_folder_dataset import ImageFolderDataset
 from tartangan.models.blocks import (
     ResidualDiscriminatorBlock, ResidualGeneratorBlock,
     GeneratorInputMLP, TiledZGeneratorInput
@@ -29,24 +30,39 @@ class Trainer:
     def build_models(self):
         pass
 
+    def prepare_dataset(self):
+        img_size = self.g.max_size
+        if os.path.isdir(self.args.data_path):
+            # use the old "JustImagesDataset"
+            transform = transforms.Compose([
+                transforms.Resize((img_size, img_size), interpolation=Image.LANCZOS),
+                transforms.ToTensor(),
+                transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+            ])
+            dataset = ImageFolderDataset(
+                self.args.data_path, transform=transform
+            )
+            if self.args.dataset_cache:
+                dataset.load_cache(self.dataset_cache_path(img_size))
+        else:
+            # load up a tensor dataset
+            transform = transforms.Compose([
+                transforms.ToTensor(),
+                transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+            ])
+            dataset = ImageBytesDataset.from_path(
+                self.args.data_path, transform=transform
+            )
+        return dataset
+
     def train(self):
         os.makedirs(os.path.dirname(self.args.sample_file), exist_ok=True)
         os.makedirs(os.path.dirname(self.args.checkpoint), exist_ok=True)
         self.build_models()
         self.progress_samples = self.sample_z(32)
-        img_size = self.g.max_size
-        transform = transforms.Compose([
-            transforms.Resize((img_size, img_size), interpolation=Image.LANCZOS),
-            transforms.ToTensor(),
-            transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
-        ])
-        self.dataset = dataset = JustImagesDataset(
-            self.args.data_path, transform=transform
-        )
-        if self.args.dataset_cache:
-            self.dataset.load_cache(self.dataset_cache_path(img_size))
+        self.dataset = self.prepare_dataset()
         train_loader = data_utils.DataLoader(
-            dataset, batch_size=self.args.batch_size, shuffle=True, drop_last=True
+            self.dataset, batch_size=self.args.batch_size, shuffle=True, drop_last=True
         )
         steps = 0
         for epoch_i in range(self.args.epochs):
@@ -60,7 +76,8 @@ class Trainer:
                 if steps % self.args.checkpoint_freq == 0:
                     self.save_checkpoint(f'{self.args.checkpoint}_{steps}')
             if epoch_i == 0 and self.args.cache_dataset:
-                self.dataset.save_cache(self.dataset_cache_path(img_size))
+                if hasattr(self.dataset, 'save_cache'):
+                    self.dataset.save_cache(self.dataset_cache_path(img_size))
 
     def dataset_cache_path(self, size):
         root_hash = hashlib.md5(self.dataset.root.encode('utf-8')).hexdigest()

@@ -10,7 +10,6 @@ import torchvision
 from torchvision import transforms
 import tqdm
 
-from tartangan.image_dataset import JustImagesDataset
 from tartangan.models.blocks import (
     GeneratorBlock, DiscriminatorBlock, IQNDiscriminatorOutput,
     ResidualDiscriminatorBlock, ResidualGeneratorBlock,
