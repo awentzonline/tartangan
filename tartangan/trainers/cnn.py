@@ -13,7 +13,8 @@ import tqdm
 from tartangan.models.blocks import (
     GeneratorBlock, DiscriminatorBlock,
     ResidualDiscriminatorBlock, ResidualGeneratorBlock,
-    GeneratorInputMLP, TiledZGeneratorInput
+    GeneratorInputMLP, TiledZGeneratorInput,
+    GeneratorOutput, DiscriminatorOutput,
 )
 from tartangan.models.pluggan import Discriminator, Generator, GAN_CONFIGS
 from tartangan.models.losses import (
@@ -27,31 +28,44 @@ class CNNTrainer(Trainer):
     def build_models(self):
         self.gan_config = GAN_CONFIGS[self.args.config]
         self.gan_config = self.gan_config.scale_model(self.args.model_scale)
-        g_block_factory = functools.partial(
-            ResidualGeneratorBlock, #norm_factory=nn.Identity#nn.InstanceNorm2d#
-        )
-        d_block_factory = functools.partial(
-            ResidualDiscriminatorBlock, #norm_factory=nn.Identity#nn.InstanceNorm2d#
-        )
+        norm_factory = {
+            'id': nn.Identity,
+            'bn': nn.BatchNorm2d,
+        }[self.args.norm]
         g_input_factory = {
             'mlp': GeneratorInputMLP,
             'tiledz': TiledZGeneratorInput,
         }[self.args.g_base]
+        g_block_factory = functools.partial(
+            ResidualGeneratorBlock, norm_factory=norm_factory
+        )
+        d_block_factory = functools.partial(
+            ResidualDiscriminatorBlock, norm_factory=norm_factory
+        )
+        g_output_factory = functools.partial(
+            GeneratorOutput, norm_factory=norm_factory
+        )
+        d_output_factory = functools.partial(
+            DiscriminatorOutput, norm_factory=norm_factory
+        )
         self.g = Generator(
             self.gan_config,
             input_factory=g_input_factory,
-            block_factory=g_block_factory
+            block_factory=g_block_factory,
+            output_factory=g_output_factory,
         ).to(self.device)
         self.target_g = Generator(
             self.gan_config,
             input_factory=g_input_factory,
-            block_factory=g_block_factory
+            block_factory=g_block_factory,
+            output_factory=g_output_factory,
         ).to(self.device)
         self.update_target_generator(1.)  # copy weights
 
         self.d = Discriminator(
             self.gan_config,
-            block_factory=d_block_factory
+            block_factory=d_block_factory,
+            output_factory=d_output_factory,
         ).to(self.device)
         self.optimizer_g = torch.optim.Adam(self.g.parameters(), lr=self.args.lr_g, betas=(0., 0.999))
         self.optimizer_d = torch.optim.Adam(self.d.parameters(), lr=self.args.lr_d, betas=(0., 0.999))
@@ -148,6 +162,7 @@ if __name__ == '__main__':
     p.add_argument('--log-dir', default='./logs')
     p.add_argument('--tensorboard', action='store_true')
     p.add_argument('--g-base', default='mlp', help='mlp or tiledz')
+    p.add_argument('--norm', default='bn', help='bn or id')
     args = p.parse_args()
 
     trainer = CNNTrainer(args)

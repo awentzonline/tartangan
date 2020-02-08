@@ -74,7 +74,8 @@ class Trainer:
             for batch_i, images in enumerate(loader_iter):
                 metrics = self.train_batch(images)
                 self.log_metrics(metrics, steps)
-                loader_iter.set_postfix(**metrics)
+                round_metrics = {k: round(v, 4) for k, v in metrics.items()}
+                loader_iter.set_postfix(**round_metrics)
                 steps += 1
                 if steps % self.args.gen_freq == 0:
                     self.output_samples(f'{self.args.sample_file}_{steps}.png')
@@ -237,6 +238,7 @@ if __name__ == '__main__':
     p.add_argument('--log-dir', default='runs')
     p.add_argument('--tensorboard', action='store_true')
     p.add_argument('--g-base', default='mlp', help='mlp or tiledz')
+    p.add_argument('--norm', default='bn', help='bn or id')
     args = p.parse_args()
 
     trainer = CNNTrainer(args)
