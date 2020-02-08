@@ -13,7 +13,8 @@ import tqdm
 from tartangan.models.blocks import (
     GeneratorBlock, DiscriminatorBlock, IQNDiscriminatorOutput,
     ResidualDiscriminatorBlock, ResidualGeneratorBlock,
-    GeneratorInputMLP, TiledZGeneratorInput
+    GeneratorInputMLP, TiledZGeneratorInput,
+    GeneratorOutput, DiscriminatorOutput,
 )
 from tartangan.models.layers import PixelNorm
 from tartangan.models.losses import (
