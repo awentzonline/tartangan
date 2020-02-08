@@ -236,6 +236,7 @@ if __name__ == '__main__':
     p.add_argument('--cache-dataset', action='store_true')
     p.add_argument('--log-dir', default='runs')
     p.add_argument('--tensorboard', action='store_true')
+    p.add_argument('--g-base', default='mlp', help='mlp or tiledz')
     args = p.parse_args()
 
     trainer = CNNTrainer(args)

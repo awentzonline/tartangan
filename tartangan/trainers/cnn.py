@@ -10,7 +10,6 @@ import torchvision
 from torchvision import transforms
 import tqdm
 
-from tartangan.image_dataset import JustImagesDataset
 from tartangan.models.blocks import (
     GeneratorBlock, DiscriminatorBlock,
     ResidualDiscriminatorBlock, ResidualGeneratorBlock,
@@ -34,14 +33,18 @@ class CNNTrainer(Trainer):
         d_block_factory = functools.partial(
             ResidualDiscriminatorBlock, #norm_factory=nn.Identity#nn.InstanceNorm2d#
         )
+        g_input_factory = {
+            'mlp': GeneratorInputMLP,
+            'tiledz': TiledZGeneratorInput,
+        }[self.args.g_base]
         self.g = Generator(
             self.gan_config,
-            input_factory=TiledZGeneratorInput,
+            input_factory=g_input_factory,
             block_factory=g_block_factory
         ).to(self.device)
         self.target_g = Generator(
             self.gan_config,
-            input_factory=TiledZGeneratorInput,
+            input_factory=g_input_factory,
             block_factory=g_block_factory
         ).to(self.device)
         self.update_target_generator(1.)  # copy weights
@@ -144,6 +147,7 @@ if __name__ == '__main__':
     p.add_argument('--cache-dataset', action='store_true')
     p.add_argument('--log-dir', default='./logs')
     p.add_argument('--tensorboard', action='store_true')
+    p.add_argument('--g-base', default='mlp', help='mlp or tiledz')
     args = p.parse_args()
 
     trainer = CNNTrainer(args)
