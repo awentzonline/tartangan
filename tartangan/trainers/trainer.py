@@ -8,6 +8,7 @@ from PIL import Image
 import torch
 from torch import nn
 import torch.utils.data as data_utils
+from torch.utils.tensorboard import SummaryWriter
 import torchvision
 from torchvision import transforms
 import tqdm
@@ -26,6 +27,9 @@ from tartangan.models.losses import (
 class Trainer:
     def __init__(self, args):
         self.args = args
+        self.summary_writer = None
+        if self.args.tensorboard:
+            self.summary_writer = SummaryWriter()
 
     def build_models(self):
         pass
@@ -69,6 +73,7 @@ class Trainer:
             loader_iter = tqdm.tqdm(train_loader)
             for batch_i, images in enumerate(loader_iter):
                 metrics = self.train_batch(images)
+                self.log_metrics(metrics, steps)
                 loader_iter.set_postfix(**metrics)
                 steps += 1
                 if steps % self.args.gen_freq == 0:
@@ -85,6 +90,11 @@ class Trainer:
             root=root_hash,
             size=size
         )
+
+    def log_metrics(self, metrics, i=None):
+        if not self.summary_writer:
+            return
+        self.summary_writer.add_scalars('training', metrics, i)
 
     def train_batch(self, imgs):
         # train discriminator
@@ -219,11 +229,13 @@ if __name__ == '__main__':
     p.add_argument('--base-dims', type=int, default=16)
     p.add_argument('--sample-file', default='sample/tartangan')
     p.add_argument('--checkpoint-freq', type=int, default=100000)
-    p.add_argument('--checkpoint', default='checkpoint/tartangan')
+    p.add_argument('--checkpoint', default='checkpoints/tartangan')
     p.add_argument('--dataset-cache', default='cache/{root}_{size}.pkl')
     p.add_argument('--grad-penalty', type=float, default=5.)
     p.add_argument('--model-scale', type=float, default=1.)
     p.add_argument('--cache-dataset', action='store_true')
+    p.add_argument('--log-dir', default='runs')
+    p.add_argument('--tensorboard', action='store_true')
     args = p.parse_args()
 
     trainer = CNNTrainer(args)
