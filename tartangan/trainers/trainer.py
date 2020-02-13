@@ -8,7 +8,10 @@ from PIL import Image
 import torch
 from torch import nn
 import torch.utils.data as data_utils
-from torch.utils.tensorboard import SummaryWriter
+try:
+    from torch.utils.tensorboard import SummaryWriter
+except ImportError:
+    print('Tensorboard not available.')
 import torchvision
 from torchvision import transforms
 import tqdm
