@@ -39,6 +39,8 @@ class SharedGenerator(Generator):
         x = self.input_conv(x)
         depth = self.config.num_scales - 1
         for i in range(depth):
+            if self.config.attention and i in self.config.attention:
+                x = self.attention_block(x)
             x = self.shared_conv(x)
         return self.output_block(x)
 
@@ -61,7 +63,9 @@ class SharedIQNDiscriminator(Discriminator):
     def forward(self, x, targets=None):
         x = self.input_block(x)
         depth = self.config.num_scales
-        for i in range(depth):
+        for i in reversed(range(depth)):
+            if self.config.attention and i in self.config.attention:
+                x = self.attention_block(x)
             x = self.shared_conv(x)
         return self.output_block(x, targets=targets)
 
@@ -69,7 +73,7 @@ class SharedIQNDiscriminator(Discriminator):
 class SharedGANConfig(
     namedtuple(
         'SharedGANConfig',
-        'base_size, latent_dims, data_dims, num_scales, block_dims'
+        'base_size, latent_dims, data_dims, num_scales, block_dims, attention'
     )
 ):
     def scale_model(self, scale):
@@ -85,6 +89,7 @@ SHARED_GAN_CONFIGS = {
         latent_dims=100,
         num_scales=2,
         block_dims=64,
+        attention=(1,),
     ),
     # '32': GANConfig(
     #     base_size=4,
@@ -117,6 +122,7 @@ SHARED_GAN_CONFIGS = {
         latent_dims=256,
         num_scales=5,
         block_dims=128,
+        attention=(2,),
     ),
     # '256': GANConfig(
     #     base_size=4,
