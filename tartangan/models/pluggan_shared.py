@@ -73,9 +73,8 @@ class SharedGANConfig(
     )
 ):
     def scale_model(self, scale):
-        scaled = list(map(lambda x: int(x * scale), self.blocks))
         kwargs = self._asdict()
-        kwargs['blocks'] = scaled
+        kwargs['block_dims'] = self.block_dims * scale
         return self.__class__(**kwargs)
 
 
