@@ -51,6 +51,25 @@ class SharedGenerator(Generator):
         return max_scale * self.config.base_size
 
 
+class SharedDiscriminator(Discriminator):
+    default_output = DiscriminatorOutput
+
+    def build(self):
+        self.input_block = self.input_factory(self.config.data_dims, self.config.block_dims)
+        self.shared_conv = self.block_factory(self.config.block_dims, self.config.block_dims)
+        self.output_block = self.output_factory(self.config.block_dims, 1)
+        self.attention_block = SelfAttention2d(self.config.block_dims)
+
+    def forward(self, x):
+        x = self.input_block(x)
+        depth = self.config.num_scales
+        for i in reversed(range(depth)):
+            if self.config.attention and i in self.config.attention:
+                x = self.attention_block(x)
+            x = self.shared_conv(x)
+        return self.output_block(x)
+
+
 class SharedIQNDiscriminator(Discriminator):
     default_output = IQNDiscriminatorOutput
 
