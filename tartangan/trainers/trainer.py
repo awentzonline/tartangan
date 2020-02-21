@@ -195,7 +195,7 @@ class Trainer:
         g_target_filename = f'{filename}_g_target.pt'
         d_filename = f'{filename}_d.pt'
         torch.save(self.g, g_filename)
-        torch.save(self.g_target, g_target_filename)
+        torch.save(self.target_g, g_target_filename)
         torch.save(self.d, d_filename)
 
     def load_checkpoint(self, filename):
@@ -203,7 +203,7 @@ class Trainer:
         g_target_filename = f'{filename}_g_target.pt'
         d_filename = f'{filename}_d.pt'
         self.g = torch.load(g_filename)
-        self.g_target = torch.load(g_target_filename)
+        self.target_g = torch.load(g_target_filename)
         self.d = torch.load(d_filename)
 
     @property
