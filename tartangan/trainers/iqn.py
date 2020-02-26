@@ -68,8 +68,8 @@ class IQNTrainer(Trainer):
             block_factory=d_block_factory,
             output_factory=IQNDiscriminatorOutput,
         ).to(self.device)
-        self.optimizer_g = torch.optim.Adam(self.g.parameters(), lr=self.args.lr_g, betas=(0., 0.999))
-        self.optimizer_d = torch.optim.Adam(self.d.parameters(), lr=self.args.lr_d, betas=(0., 0.999))
+        self.optimizer_g = torch.optim.Adam(self.g.parameters(), lr=self.args.lr_g, betas=(0.5, 0.999))
+        self.optimizer_d = torch.optim.Adam(self.d.parameters(), lr=self.args.lr_d, betas=(0.5, 0.999))
         print(self.g)
         print(self.d)
 

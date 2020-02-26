@@ -152,7 +152,7 @@ class TiledZGeneratorInput(nn.Module):
 
 
 class GeneratorOutput(nn.Module):
-    def __init__(self, in_dims, out_dims, norm_factory=nn.BatchNorm2d,
+    def __init__(self, in_dims, out_dims, norm_factory=nn.Identity,#nn.BatchNorm2d,
                  activation_factory=nn.ReLU):
         super().__init__()
         self.convs = nn.Sequential(
@@ -187,7 +187,7 @@ class DiscriminatorOutput(nn.Module):
             norm_factory(in_dims),
             nn.LeakyReLU(0.2),
             nn.Conv2d(in_dims, out_dims, 1, padding=0, bias=True),
-            nn.Sigmoid()
+        #    nn.Sigmoid()
         )
         # map(nn.init.orthogonal_, self.parameters())
 

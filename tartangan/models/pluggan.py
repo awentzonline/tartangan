@@ -180,6 +180,21 @@ GAN_CONFIGS = {
             16,  # 128,
         )
     ),
+    '128big': GANConfig(
+        base_size=4,
+        data_dims=3,
+        #latent_dims=256,
+        latent_dims=256,
+        attention=(2,),
+        num_blocks_per_scale=1,
+        blocks=(
+            1024,  # 8,
+            1024,  # 16,
+            512,  # 32,
+            256,  # 64,
+            128,  # 128,
+        )
+    ),
     '256': GANConfig(
         base_size=4,
         data_dims=3,
@@ -193,6 +208,21 @@ GAN_CONFIGS = {
             64,  # 64,
             32,  # 128,
             16,  # 256
+        )
+    ),
+    '256big': GANConfig(
+        base_size=4,
+        data_dims=3,
+        latent_dims=256,
+        attention=(3,),
+        num_blocks_per_scale=1,
+        blocks=(
+            1024,  # 8,
+            1024,  # 16,
+            512,  # 32,
+            256,  # 64,
+            128,  # 128,
+            64,  # 256
         )
     ),
     '512': GANConfig(
