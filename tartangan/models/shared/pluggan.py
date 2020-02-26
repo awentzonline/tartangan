@@ -10,9 +10,8 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 from ..blocks import (
-    GeneratorInputMLP, DiscriminatorInput,
-    DiscriminatorOutput, GeneratorOutput,
-    SelfAttention2d, TiledZGeneratorInput
+    GeneratorInputMLP, DiscriminatorInput, DiscriminatorOutput, GeneratorOutput,
+    IQNDiscriminatorOutput, SelfAttention2d, TiledZGeneratorInput
 )
 from .blocks import (
     SharedConvBlock, SharedResidualDiscriminatorBlock,
@@ -121,3 +120,36 @@ class SharedDiscriminator(SharedModel):
             self.output_factory(out_dims, 1)
         )
         self.blocks = nn.Sequential(*blocks)
+
+
+class SharedIQNDiscriminator(SharedDiscriminator):
+    default_output = IQNDiscriminatorOutput
+
+    def build(self):
+        first_block_input_dims = next(reversed(self.config.blocks))
+        blocks = [
+            self.input_factory(self.config.data_dims, first_block_input_dims)
+        ]
+        in_dims = first_block_input_dims
+        apply_norm = False
+        for block_i, out_dims in reversed(list(enumerate(self.config.blocks))):
+            scale_blocks = []
+            scale_blocks.append(
+                self.block_factory(
+                    self.shared_filters, in_dims, out_dims, apply_norm=apply_norm,
+                )
+            )
+            apply_norm = True
+
+            if self.config.attention and block_i in self.config.attention:
+                scale_blocks.append(SelfAttention2d(out_dims))
+
+            blocks += scale_blocks
+            in_dims = out_dims
+        self.blocks = nn.Sequential(*blocks)
+        self.to_output = self.output_factory(out_dims, 1)
+
+    def forward(self, x, targets=None):
+        y = self.blocks(x)
+        out = self.to_output(y, targets=targets)
+        return out

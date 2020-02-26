@@ -11,26 +11,26 @@ from torchvision import transforms
 import tqdm
 
 from tartangan.models.blocks import (
-    GeneratorBlock, DiscriminatorBlock, IQNDiscriminatorOutput,
-    ResidualDiscriminatorBlock, ResidualGeneratorBlock,
     GeneratorInputMLP, TiledZGeneratorInput,
     GeneratorOutput, DiscriminatorOutput,
+    IQNDiscriminatorOutput
 )
-from tartangan.models.layers import PixelNorm
-from tartangan.models.losses import (
-    discriminator_hinge_loss, generator_hinge_loss, gradient_penalty
+from tartangan.models.losses import gradient_penalty
+from tartangan.models.pluggan import GAN_CONFIGS
+from tartangan.models.shared.blocks import (
+    SharedResidualDiscriminatorBlock, SharedResidualGeneratorBlock
 )
-from tartangan.models.pluggan import IQNDiscriminator, Generator, GAN_CONFIGS
-from tartangan.models.pluggan_shared import (
-    SHARED_GAN_CONFIGS, SharedGenerator, SharedIQNDiscriminator
+from tartangan.models.shared.pluggan import (
+    SharedGenerator, SharedIQNDiscriminator
 )
-from .trainer import Trainer
+
+from ..trainer import Trainer
 
 
 class IQNTrainer(Trainer):
     def build_models(self):
-        self.gan_config = SHARED_GAN_CONFIGS[self.args.config]
-        #self.gan_config = self.gan_config.scale_model(self.args.model_scale)
+        self.gan_config = GAN_CONFIGS[self.args.config]
+        self.gan_config = self.gan_config.scale_model(self.args.model_scale)
         norm_factory = {
             'id': nn.Identity,
             'bn': nn.BatchNorm2d,
@@ -40,10 +40,10 @@ class IQNTrainer(Trainer):
             'tiledz': TiledZGeneratorInput,
         }[self.args.g_base]
         g_block_factory = functools.partial(
-            ResidualGeneratorBlock, norm_factory=norm_factory
+            SharedResidualGeneratorBlock, norm_factory=norm_factory
         )
         d_block_factory = functools.partial(
-            ResidualDiscriminatorBlock, norm_factory=norm_factory
+            SharedResidualDiscriminatorBlock, norm_factory=norm_factory
         )
         g_output_factory = functools.partial(
             GeneratorOutput, norm_factory=norm_factory
@@ -70,8 +70,8 @@ class IQNTrainer(Trainer):
             block_factory=d_block_factory,
             output_factory=IQNDiscriminatorOutput,
         ).to(self.device)
-        self.optimizer_g = torch.optim.Adam(self.g.parameters(), lr=self.args.lr_g, betas=(0., 0.999))
-        self.optimizer_d = torch.optim.Adam(self.d.parameters(), lr=self.args.lr_d, betas=(0., 0.999))
+        self.optimizer_g = torch.optim.Adam(self.g.parameters(), lr=self.args.lr_g, betas=(0.5, 0.999))
+        self.optimizer_d = torch.optim.Adam(self.d.parameters(), lr=self.args.lr_d, betas=(0.5, 0.999))
         print(self.g)
         print(self.d)
 
