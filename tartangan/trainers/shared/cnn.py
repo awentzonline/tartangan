@@ -71,6 +71,8 @@ class CNNTrainer(Trainer):
         ).to(self.device)
         self.optimizer_g = torch.optim.Adam(self.g.parameters(), lr=self.args.lr_g, betas=(0.5, 0.999))
         self.optimizer_d = torch.optim.Adam(self.d.parameters(), lr=self.args.lr_d, betas=(0.5, 0.999))
+        print(len(list(self.g.parameters())))
+        print(len(self.optimizer_g.param_groups[0]['params']))
         self.d_loss = discriminator_hinge_loss
         self.g_loss = generator_hinge_loss
         self.bce_loss = nn.BCEWithLogitsLoss()

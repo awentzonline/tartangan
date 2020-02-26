@@ -44,11 +44,11 @@ class SharedResidualGeneratorBlock(nn.Module):
         super().__init__()
         self.blocks = nn.Sequential(
             SharedConvBlock(
-                shared_filters, in_dims, out_dims, apply_norm=apply_norm,
+                shared_filters, in_dims, out_dims, apply_norm=apply_norm, bias=bias,
                 norm_factory=norm_factory, activation_factory=activation_factory
             ),
             SharedConvBlock(
-                shared_filters, out_dims, out_dims, apply_norm=True,
+                shared_filters, out_dims, out_dims, apply_norm=True, bias=bias,
                 norm_factory=norm_factory, activation_factory=activation_factory
             ),
         )
@@ -81,11 +81,11 @@ class SharedResidualDiscriminatorBlock(nn.Module):
         super().__init__()
         self.blocks = nn.Sequential(
             SharedConvBlock(
-                shared_filters, in_dims, out_dims, apply_norm=apply_norm,
+                shared_filters, in_dims, out_dims, apply_norm=apply_norm, bias=bias,
                 norm_factory=norm_factory, activation_factory=activation_factory
             ),
             SharedConvBlock(
-                shared_filters, out_dims, out_dims, apply_norm=True,
+                shared_filters, out_dims, out_dims, apply_norm=True, bias=bias,
                 norm_factory=norm_factory, activation_factory=activation_factory
             ),
         )
@@ -116,6 +116,7 @@ class SharedResidualDiscriminatorBlock(nn.Module):
         return x
 
 
-def narrow_filters(f, in_dims, out_dims):
-    f = f.narrow(0, 0, out_dims).narrow(1, 0, in_dims)
-    return f
+def narrow_filters(filters, in_dims, out_dims):
+    """Extract the first NxM filters."""
+    filters = filters.narrow(0, 0, out_dims).narrow(1, 0, in_dims)
+    return filters

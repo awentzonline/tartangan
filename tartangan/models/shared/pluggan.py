@@ -48,7 +48,6 @@ class SharedModel(nn.Module):
 
     def forward(self, x):
         return self.blocks(x)
-        #return reduce(lambda f, b: b(f), self.blocks, x)
 
     @property
     def max_size(self):
@@ -72,15 +71,17 @@ class SharedGenerator(SharedModel):
         in_dims = self.config.latent_dims
         apply_norm = False
         for block_i, out_dims in enumerate(self.config.blocks):
-            scale_blocks = [
+            scale_blocks = []
+
+            if self.config.attention and block_i in self.config.attention:
+                scale_blocks.append(SelfAttention2d(in_dims))
+
+            scale_blocks.append(
                 self.block_factory(
                     self.shared_filters, in_dims, out_dims, apply_norm=apply_norm
                 )
-            ]
+            )
             apply_norm = True
-
-            if self.config.attention and block_i in self.config.attention:
-                scale_blocks.append(SelfAttention2d(out_dims))
 
             blocks += scale_blocks
             in_dims = out_dims
@@ -103,11 +104,12 @@ class SharedDiscriminator(SharedModel):
         in_dims = first_block_input_dims
         apply_norm = False
         for block_i, out_dims in reversed(list(enumerate(self.config.blocks))):
-            scale_blocks = [
+            scale_blocks = []
+            scale_blocks.append(
                 self.block_factory(
                     self.shared_filters, in_dims, out_dims, apply_norm=apply_norm,
                 )
-            ]
+            )
             apply_norm = True
 
             if self.config.attention and block_i in self.config.attention:
