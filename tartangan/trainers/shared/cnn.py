@@ -69,8 +69,8 @@ class CNNTrainer(Trainer):
             block_factory=d_block_factory,
             output_factory=d_output_factory,
         ).to(self.device)
-        self.optimizer_g = torch.optim.Adam(self.g.parameters(), lr=self.args.lr_g, betas=(0.5, 0.999))
-        self.optimizer_d = torch.optim.Adam(self.d.parameters(), lr=self.args.lr_d, betas=(0.5, 0.999))
+        self.optimizer_g = torch.optim.Adam(self.g.parameters(), lr=self.args.lr_g, betas=(0., 0.999))
+        self.optimizer_d = torch.optim.Adam(self.d.parameters(), lr=self.args.lr_d, betas=(0., 0.999))
         print(len(list(self.g.parameters())))
         print(len(self.optimizer_g.param_groups[0]['params']))
         self.d_loss = discriminator_hinge_loss
