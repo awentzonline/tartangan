@@ -8,7 +8,7 @@ from .layers import Interpolate, PixelNorm
 
 class GeneratorBlock(nn.Module):
     def __init__(self, in_dims, out_dims, upsample=True, first_block=False,
-                 norm_factory=nn.BatchNorm2d, activation_factory=nn.ReLU):
+                 norm_factory=nn.BatchNorm2d, activation_factory=nn.LeakyReLU):
         super().__init__()
         layers = [
             norm_factory(out_dims),
@@ -31,7 +31,7 @@ class GeneratorBlock(nn.Module):
 
 class ResidualGeneratorBlock(nn.Module):
     def __init__(self, in_dims, out_dims, upsample=True, first_block=False,
-                 norm_factory=nn.BatchNorm2d, activation_factory=nn.ReLU):
+                 norm_factory=nn.BatchNorm2d, activation_factory=nn.LeakyReLU):
         super().__init__()
 
         layers = [
@@ -129,7 +129,7 @@ class GeneratorInputMLP(nn.Module):
         base_img_dims = size ** 2 * latent_dims
         self.base_img = nn.Sequential(
             nn.Linear(latent_dims, base_img_dims),
-            nn.ReLU(),
+            nn.LeakyReLU(0.2),
         )
         self.latent_dims = latent_dims
         self.size = size
@@ -153,7 +153,7 @@ class TiledZGeneratorInput(nn.Module):
 
 class GeneratorOutput(nn.Module):
     def __init__(self, in_dims, out_dims, norm_factory=nn.Identity,#nn.BatchNorm2d,
-                 activation_factory=nn.ReLU):
+                 activation_factory=nn.LeakyReLU):
         super().__init__()
         self.convs = nn.Sequential(
             norm_factory(in_dims),
