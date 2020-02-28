@@ -181,7 +181,7 @@ class DiscriminatorInput(nn.Module):
 
 
 class DiscriminatorOutput(nn.Module):
-    def __init__(self, in_dims, out_dims, norm_factory=nn.BatchNorm2d):
+    def __init__(self, in_dims, out_dims, norm_factory=nn.BatchNorm2d, pool='sum'):
         super().__init__()
         self.convs = nn.Sequential(
             norm_factory(in_dims),
@@ -189,11 +189,17 @@ class DiscriminatorOutput(nn.Module):
             nn.Conv2d(in_dims, out_dims, 1, padding=0, bias=True),
         #    nn.Sigmoid()
         )
+        self.pool = pool
         # map(nn.init.orthogonal_, self.parameters())
 
     def forward(self, img):
         feats = self.convs(img)
-        return F.avg_pool2d(feats, feats.size()[2:]).view(-1, 1)
+        if self.pool == 'avg':
+            return F.avg_pool2d(feats, feats.size()[2:]).view(-1, 1)
+        elif self.pool == 'sum':
+            return torch.sum(feats, [1, 2, 3])[..., None]
+        else:
+            raise ValueError(f'DiscriminatorOutput has no pooling method named "{self.pool}"')
 
 
 class IQNDiscriminatorOutput(nn.Module):
