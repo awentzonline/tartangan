@@ -239,7 +239,8 @@ class SelfAttention2d(nn.Module):
     def __init__(self, in_dims, attention_dims=None):
         super().__init__()
         if attention_dims is None:
-            self.attention_dims = attention_dims = in_dims // 8
+            attention_dims = in_dims // 8
+        self.attention_dims = attention_dims
         self.query = nn.Sequential(
             nn.Conv2d(in_dims, attention_dims, 1, padding=0),
         )
