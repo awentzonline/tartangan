@@ -8,7 +8,7 @@ def read(fname):
 
 setup(
     name="tartangan",
-    version="0.0.8",
+    version="0.0.9",
     author="Adam Wentz",
     author_email="adam@adamwentz.com",
     description="Model tartan patterns with a GAN.",
