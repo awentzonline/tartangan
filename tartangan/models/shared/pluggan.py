@@ -41,8 +41,9 @@ class SharedModel(nn.Module):
             torch.randn(
                 max_out_filters, max_in_filters, filter_size, filter_size,
                 requires_grad=True
-            ) * 0.1
+            ) * 0.01
         )
+        nn.init.xavier_uniform(self.shared_filters, nn.init.calculate_gain('relu'))
         self.build()
 
     def forward(self, x):
