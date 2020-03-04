@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 from torch import nn
+import torch.nn.functional as F
 
 
 class QuantileEmbedding(nn.Module):
@@ -24,21 +25,25 @@ class QuantileEmbedding(nn.Module):
 
 
 class WeightedQuantileEmbedding(nn.Module):
-    def __init__(self, state_dims, embedding_dims=20, **_):
+    def __init__(self, state_dims, num_embeddings=20, use_softmax=True, **_):
         super().__init__()
         self.quantile_embeddings = nn.Embedding(
-            embedding_dims, state_dims
+            num_embeddings, state_dims
         )
         self.quantile_indexes = nn.Parameter(
-            torch.linspace(0, 1, embedding_dims), requires_grad=False
+            torch.linspace(0, 1, num_embeddings), requires_grad=False
         )
-        self.embedding_dims = embedding_dims
+        self.num_embeddings = num_embeddings
+        self.use_softmax = use_softmax
 
     def forward(self, quantiles):
         """quantiles.shape == (batch, 1)"""
         quantile_weights = (quantiles - self.quantile_indexes).abs()
         quantile_weights = 1. / (quantile_weights + 1e-8)
-        quantile_weights = quantile_weights / quantile_weights.sum(-1, keepdim=True)
+        if self.use_softmax:
+            quantile_weights = F.softmax(quantile_weights)
+        else:
+            quantile_weights = quantile_weights / quantile_weights.sum(-1, keepdim=True)
         weighted_embeddings = torch.mm(
             quantile_weights,
             self.quantile_embeddings.weight
