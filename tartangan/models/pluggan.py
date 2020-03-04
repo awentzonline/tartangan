@@ -157,7 +157,7 @@ GAN_CONFIGS = {
         base_size=4,
         data_dims=3,
         latent_dims=128,
-        attention=(2,),
+        attention=(1,),
         num_blocks_per_scale=1,
         blocks=(
             128,  # 8,
