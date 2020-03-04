@@ -41,7 +41,7 @@ class WeightedQuantileEmbedding(nn.Module):
         quantile_weights = (quantiles - self.quantile_indexes).abs()
         quantile_weights = 1. / (quantile_weights + 1e-8)
         if self.use_softmax:
-            quantile_weights = F.softmax(quantile_weights)
+            quantile_weights = F.softmax(quantile_weights, dim=-1)
         else:
             quantile_weights = quantile_weights / quantile_weights.sum(-1, keepdim=True)
         weighted_embeddings = torch.mm(
