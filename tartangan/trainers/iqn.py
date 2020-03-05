@@ -66,7 +66,7 @@ class IQNTrainer(Trainer):
         self.d = IQNDiscriminator(
             self.gan_config,
             block_factory=d_block_factory,
-            output_factory=IQNDiscriminatorOutput,
+            output_factory=d_output_factory,
         ).to(self.device)
         self.optimizer_g = torch.optim.Adam(self.g.parameters(), lr=self.args.lr_g, betas=(0., 0.999))
         self.optimizer_d = torch.optim.Adam(self.d.parameters(), lr=self.args.lr_d, betas=(0., 0.999))
@@ -88,7 +88,7 @@ class IQNTrainer(Trainer):
         if self.args.grad_penalty:
             real.requires_grad_()
         p_labels_real, d_loss_real = self.d(real, targets=labels[:len(labels) // 2])
-        p_labels_fake, d_loss_fake = self.d(fake.detach(), targets=labels[len(labels) // 2])
+        p_labels_fake, d_loss_fake = self.d(fake.detach(), targets=labels[len(labels) // 2:])
         d_loss = d_loss_real + d_loss_fake
         d_grad_penalty = 0.
         if self.args.grad_penalty:

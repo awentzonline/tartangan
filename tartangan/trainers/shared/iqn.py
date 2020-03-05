@@ -90,7 +90,7 @@ class IQNTrainer(Trainer):
         if self.args.grad_penalty:
             real.requires_grad_()
         p_labels_real, d_loss_real = self.d(real, targets=labels[:len(labels) // 2])
-        p_labels_fake, d_loss_fake = self.d(fake.detach(), targets=labels[len(labels) // 2])
+        p_labels_fake, d_loss_fake = self.d(fake.detach(), targets=labels[len(labels) // 2:])
         d_loss = d_loss_real + d_loss_fake
         d_grad_penalty = 0.
         if self.args.grad_penalty:
