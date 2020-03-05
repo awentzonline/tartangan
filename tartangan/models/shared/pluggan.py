@@ -65,10 +65,10 @@ class SharedGenerator(SharedModel):
     default_output = GeneratorOutput
 
     def build(self):
+        in_dims = self.config.blocks[0]
         blocks = [
-            self.input_factory(self.config.latent_dims, self.config.base_size)
+            self.input_factory(self.config.latent_dims, in_dims, self.config.base_size)
         ]
-        in_dims = self.config.latent_dims
         apply_norm = False
         for block_i, out_dims in enumerate(self.config.blocks):
             scale_blocks = []
