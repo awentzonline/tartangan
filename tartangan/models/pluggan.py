@@ -8,6 +8,7 @@ from torch import nn
 import torch.nn.functional as F
 from .blocks import (
     DiscriminatorBlock, DiscriminatorOutput, DiscriminatorInput,
+    E2EIQNDiscriminatorOutput, IQNGeneratorInputMLP
     GeneratorBlock, GeneratorInputMLP, GeneratorOutput,
     ResidualDiscriminatorBlock, ResidualGeneratorBlock,
     SelfAttention2d, TiledZGeneratorInput
@@ -129,6 +130,62 @@ class IQNDiscriminator(Discriminator):
         return out
 
 
+class E2EIQNDiscriminator(Discriminator):
+    default_output = E2EIQNDiscriminatorOutput
+
+    def build(self):
+        blocks = []
+        in_dims = self.config.data_dims
+        for block_i, out_dims in reversed(list(enumerate(self.config.blocks))):
+            block = self.block_factory(in_dims, out_dims)
+            blocks.append(block)
+            if self.config.attention and block_i in self.config.attention:
+                blocks.append(SelfAttention2d(out_dims))
+            in_dims = out_dims
+        self.to_output = self.output_factory(out_dims, 1)
+        self.blocks = nn.Sequential(*blocks)
+
+    def forward(self, x, taus, targets=None):
+        y = self.blocks(x)
+        out = self.to_output(y, taus, targets=targets)
+        return out
+
+
+class IQNGenerator(BlockModel):
+    default_input = IQNGeneratorInputMLP
+    default_block = GeneratorBlock
+    default_output = GeneratorOutput
+
+    def build(self):
+        # Separate the input block which will return `taus` in addition
+        # to the base features. This is the only real difference.
+        self.input_block = \
+            self.input_factory(self.config.latent_dims, self.config.base_size)
+
+        blocks = []
+        in_dims = self.config.latent_dims
+        num_blocks_per_scale = self.config.num_blocks_per_scale
+        first_block = True
+        for block_i, out_dims in enumerate(self.config.blocks):
+            scale_blocks = [self.block_factory(in_dims, out_dims, first_block=first_block)]
+            first_block = False
+            for i in range(num_blocks_per_scale - 1):
+                scale_blocks.append(self.block_factory(out_dims, out_dims, upsample=False))
+            if self.config.attention and block_i in self.config.attention:
+                scale_blocks.append(SelfAttention2d(out_dims))
+            blocks += scale_blocks
+            in_dims = out_dims
+        blocks.append(
+            self.output_factory(out_dims, self.config.data_dims)
+        )
+        self.blocks = nn.Sequential(*blocks)
+
+    def forward(self, x):
+        x, taus = self.input_block(x)
+        y = reduce(lambda f, b: b(f), self.blocks, x)
+        return y, taus
+
+
 GAN_CONFIGS = {
     '16': GANConfig(
         base_size=4,
@@ -145,7 +202,7 @@ GAN_CONFIGS = {
         base_size=4,
         data_dims=3,
         latent_dims=128,
-        attention=(1,),
+        attention=(), #(1,),
         num_blocks_per_scale=1,
         blocks=(
             128,  # 8,

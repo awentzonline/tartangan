@@ -151,6 +151,29 @@ class TiledZGeneratorInput(nn.Module):
         return components
 
 
+class IQNGeneratorInputMLP(nn.Module):
+    def __init__(self, latent_dims, size=4, norm_factory=nn.BatchNorm1d)
+        super().__init__()
+        base_img_dims = size ** 2 * latent_dims
+        self.base_img = nn.Sequential(
+            nn.Linear(latent_dims, base_img_dims),
+            nn.LeakyReLU(0.2),
+        )
+        self.latent_dims = latent_dims
+        self.size = size
+
+        self.iqn = IQN(base_img_dims)
+        self.out_dims = base_img_dims
+
+    def forward(self, z):
+        feats = self.base_img(z)
+        feats_shape = [z.shape[0], self.latent_dims, self.size, self.size]
+        feats_tau, taus = self.iqn(feats)
+        feats_shape[0] = len(feats_tau)
+        feats_tau = feats_tau.view(*feats_shape)
+        return feats_tau, taus
+
+
 class GeneratorOutput(nn.Module):
     def __init__(self, in_dims, out_dims, norm_factory=nn.Identity,#nn.BatchNorm2d,
                  activation_factory=nn.LeakyReLU):
@@ -233,6 +256,52 @@ class IQNDiscriminatorOutput(nn.Module):
         if targets is not None:
             return p_target, loss
         return p_target
+
+
+class E2EIQNDiscriminatorOutput(nn.Module):
+    def __init__(self, in_dims, out_dims, norm_factory=nn.BatchNorm2d, pool='sum'):
+        super().__init__()
+        self.convs = nn.Sequential(
+            norm_factory(in_dims),
+            nn.LeakyReLU(0.2),
+            nn.Conv2d(in_dims, out_dims, 1, padding=0, bias=True),
+        #    nn.Sigmoid()
+        )
+        self.out_dims = out_dims
+        self.pool = pool
+
+    def forward(self, feats, taus, targets=None):
+        feats = self.convs(img)
+        if self.pool == 'avg':
+            p_target = F.avg_pool2d(feats, feats.size()[2:]).view(-1, 1)
+        elif self.pool == 'sum':
+            p_target = torch.sum(feats, [1, 2, 3])[..., None]
+        else:
+            raise ValueError(
+                f'E2EIQNDiscriminatorOutput has no pooling method named "{self.pool}"'
+            )
+
+        if targets is not None:
+            taus = taus.repeat(1, self.out_dims)
+            loss = iqn_loss(p_targets, targets, taus)
+        p_target_tau = p_target_tau.reshape(self.iqn.num_quantiles, -1, self.out_dims)
+        p_target = p_target_tau.mean(0)
+
+        if targets is not None:
+            return p_target, loss
+        return p_target
+
+
+class DiscriminatorOutput(nn.Module):
+
+    def forward(self, img):
+        feats = self.convs(img)
+        if self.pool == 'avg':
+            return F.avg_pool2d(feats, feats.size()[2:]).view(-1, 1)
+        elif self.pool == 'sum':
+            return torch.sum(feats, [1, 2, 3])[..., None]
+        else:
+            raise ValueError(f'DiscriminatorOutput has no pooling method named "{self.pool}"')
 
 
 class SelfAttention2d(nn.Module):
