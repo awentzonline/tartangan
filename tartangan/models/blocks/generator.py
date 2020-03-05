@@ -1,3 +1,5 @@
+import functools
+
 from torch import nn
 import torch.nn.functional as F
 
@@ -6,7 +8,8 @@ from ..layers import Interpolate
 
 class GeneratorBlock(nn.Module):
     def __init__(self, in_dims, out_dims, upsample=True, first_block=False,
-                 norm_factory=nn.BatchNorm2d, activation_factory=nn.LeakyReLU):
+                 norm_factory=nn.BatchNorm2d,
+                 activation_factory=functools.partial(nn.LeakyReLU, 0.2)):
         super().__init__()
         layers = [
             norm_factory(out_dims),
@@ -29,7 +32,8 @@ class GeneratorBlock(nn.Module):
 
 class ResidualGeneratorBlock(nn.Module):
     def __init__(self, in_dims, out_dims, upsample=True, first_block=False,
-                 norm_factory=nn.BatchNorm2d, activation_factory=nn.LeakyReLU):
+                 norm_factory=nn.BatchNorm2d,
+                 activation_factory=functools.partial(nn.LeakyReLU, 0.2)):
         super().__init__()
 
         layers = [
@@ -61,12 +65,13 @@ class ResidualGeneratorBlock(nn.Module):
 
 
 class GeneratorInputMLP(nn.Module):
-    def __init__(self, latent_dims, output_dims, size=4, norm_factory=nn.BatchNorm1d):
+    def __init__(self, latent_dims, output_dims, size=4, norm_factory=nn.BatchNorm1d,
+                 activation_factory=functools.partial(nn.LeakyReLU, 0.2)):
         super().__init__()
         base_img_dims = size ** 2 * output_dims
         self.base_img = nn.Sequential(
             nn.Linear(latent_dims, base_img_dims),
-            nn.LeakyReLU(0.2),
+            activation_factory(),
         )
         self.latent_dims = latent_dims
         self.output_dims = output_dims
@@ -91,8 +96,8 @@ class TiledZGeneratorInput(nn.Module):
 
 
 class GeneratorOutput(nn.Module):
-    def __init__(self, in_dims, out_dims, norm_factory=nn.Identity,#nn.BatchNorm2d,
-                 activation_factory=nn.LeakyReLU):
+    def __init__(self, in_dims, out_dims, norm_factory=nn.BatchNorm2d,
+                 activation_factory=functools.partial(nn.LeakyReLU, 0.2)):
         super().__init__()
         self.convs = nn.Sequential(
             norm_factory(in_dims),

@@ -1,3 +1,5 @@
+import functools
+
 import torch
 from torch import nn
 import torch.nn.functional as F
@@ -20,14 +22,16 @@ class DiscriminatorInput(nn.Module):
 
 
 class DiscriminatorBlock(nn.Module):
-    def __init__(self, in_dims, out_dims, first_block=False, norm_factory=nn.BatchNorm2d):
+    def __init__(self, in_dims, out_dims, first_block=False,
+                 norm_factory=nn.BatchNorm2d,
+                 activation_factory=functools.partial(nn.LeakyReLU, 0.2)):
         super().__init__()
         layers = [
             norm_factory(out_dims),
-            nn.LeakyReLU(0.2),
+            activation_factory(),
             nn.Conv2d(in_dims, out_dims, 3, padding=1, bias=True),
             norm_factory(out_dims),
-            nn.LeakyReLU(0.2),
+            activation_factory(),
             nn.Conv2d(out_dims, out_dims, 3, padding=1, bias=True),
             Interpolate(scale_factor=0.5, mode='bilinear', align_corners=True),
         ]
@@ -41,14 +45,16 @@ class DiscriminatorBlock(nn.Module):
 
 
 class ResidualDiscriminatorBlock(nn.Module):
-    def __init__(self, in_dims, out_dims, first_block=False, norm_factory=nn.BatchNorm2d):
+    def __init__(self, in_dims, out_dims, first_block=False,
+                 norm_factory=nn.BatchNorm2d,
+                 activation_factory=functools.partial(nn.LeakyReLU, 0.2)):
         super().__init__()
         layers = [
             norm_factory(in_dims),
-            nn.LeakyReLU(0.2),
+            activation_factory(),
             nn.Conv2d(in_dims, out_dims, 3, padding=1, bias=True),
             norm_factory(out_dims),
-            nn.LeakyReLU(0.2),
+            activation_factory(),
             nn.Conv2d(out_dims, out_dims, 3, padding=1, bias=True),
             Interpolate(scale_factor=0.5, mode='bilinear', align_corners=True),
         ]
@@ -81,12 +87,14 @@ class ResidualDiscriminatorBlock(nn.Module):
 
 
 class DiscriminatorOutput(nn.Module):
-    def __init__(self, in_dims, out_dims, norm_factory=nn.BatchNorm2d, pool='sum'):
+    def __init__(self, in_dims, out_dims, pool='sum',
+                 norm_factory=nn.BatchNorm2d,
+                 activation_factory=functools.partial(nn.LeakyReLU, 0.2)):
         super().__init__()
         kernel_size = 4 if pool == 'conv' else 1
         self.convs = nn.Sequential(
             norm_factory(in_dims),
-            nn.LeakyReLU(0.2),
+            activation_factory(),
             nn.Conv2d(in_dims, out_dims, kernel_size, padding=0, bias=True),
             # nn.Sigmoid()
         )
@@ -106,10 +114,11 @@ class DiscriminatorOutput(nn.Module):
 
 
 class IQNDiscriminatorOutput(nn.Module):
-    def __init__(self, in_dims, out_dims, norm_factory=nn.BatchNorm2d):
+    def __init__(self, in_dims, out_dims,norm_factory=nn.BatchNorm2d,
+                 activation_factory=functools.partial(nn.LeakyReLU, 0.2)):
         super().__init__()
         self.to_output = nn.Sequential(
-            nn.LeakyReLU(0.2),
+            activation_factory(),
             nn.Linear(in_dims, out_dims),
         )
         feats_dims = in_dims

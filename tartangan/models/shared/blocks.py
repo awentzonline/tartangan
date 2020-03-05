@@ -1,3 +1,5 @@
+import functools
+
 import torch
 from torch import nn
 import torch.nn.functional as F
@@ -8,7 +10,8 @@ class SharedConvBlock(nn.Module):
 
     def __init__(self, shared_filters, in_dims, out_dims,
                  apply_norm=True, bias=True,
-                 norm_factory=nn.BatchNorm2d, activation_factory=nn.LeakyReLU):
+                 norm_factory=nn.BatchNorm2d,
+                 activation_factory=functools.partial(nn.LeakyReLU, 0.2)):
         super().__init__()
 
         self.norm_and_activate = nn.Sequential(
@@ -40,7 +43,8 @@ class SharedConvBlock(nn.Module):
 class SharedResidualGeneratorBlock(nn.Module):
     def __init__(self, shared_filters, in_dims, out_dims,
                  apply_norm=True, bias=True,
-                 norm_factory=nn.BatchNorm2d, activation_factory=nn.LeakyReLU):
+                 norm_factory=nn.BatchNorm2d,
+                 activation_factory=functools.partial(nn.LeakyReLU, 0.2)):
         super().__init__()
         self.blocks = nn.Sequential(
             SharedConvBlock(
@@ -77,7 +81,8 @@ class SharedResidualGeneratorBlock(nn.Module):
 class SharedResidualDiscriminatorBlock(nn.Module):
     def __init__(self, shared_filters, in_dims, out_dims,
                  apply_norm=True, bias=True,
-                 norm_factory=nn.BatchNorm2d, activation_factory=nn.LeakyReLU):
+                 norm_factory=nn.BatchNorm2d,
+                 activation_factory=functools.partial(nn.LeakyReLU, 0.2)):
         super().__init__()
         self.blocks = nn.Sequential(
             SharedConvBlock(
