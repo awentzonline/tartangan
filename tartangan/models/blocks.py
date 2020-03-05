@@ -124,19 +124,20 @@ class ResidualDiscriminatorBlock(nn.Module):
 
 
 class GeneratorInputMLP(nn.Module):
-    def __init__(self, latent_dims, size=4, norm_factory=nn.BatchNorm1d):
+    def __init__(self, latent_dims, output_dims, size=4, norm_factory=nn.BatchNorm1d):
         super().__init__()
-        base_img_dims = size ** 2 * latent_dims
+        base_img_dims = size ** 2 * output_dims
         self.base_img = nn.Sequential(
             nn.Linear(latent_dims, base_img_dims),
             nn.LeakyReLU(0.2),
         )
         self.latent_dims = latent_dims
+        self.output_dims = output_dims
         self.size = size
 
     def forward(self, z):
         img = self.base_img(z)
-        return img.view(-1, self.latent_dims, self.size, self.size)
+        return img.view(-1, self.output_dims, self.size, self.size)
 
 
 class TiledZGeneratorInput(nn.Module):
@@ -183,14 +184,14 @@ class DiscriminatorInput(nn.Module):
 class DiscriminatorOutput(nn.Module):
     def __init__(self, in_dims, out_dims, norm_factory=nn.BatchNorm2d, pool='sum'):
         super().__init__()
+        kernel_size = 4 if pool == 'conv' else 1
         self.convs = nn.Sequential(
             norm_factory(in_dims),
             nn.LeakyReLU(0.2),
-            nn.Conv2d(in_dims, out_dims, 1, padding=0, bias=True),
+            nn.Conv2d(in_dims, out_dims, kernel_size, padding=0, bias=True),
         #    nn.Sigmoid()
         )
         self.pool = pool
-        # map(nn.init.orthogonal_, self.parameters())
 
     def forward(self, img):
         feats = self.convs(img)
@@ -198,6 +199,9 @@ class DiscriminatorOutput(nn.Module):
             return F.avg_pool2d(feats, feats.size()[2:]).view(-1, 1)
         elif self.pool == 'sum':
             return torch.sum(feats, [1, 2, 3])[..., None]
+        elif self.pool == 'conv':
+            print(feats.shape)
+            return feats
         else:
             raise ValueError(f'DiscriminatorOutput has no pooling method named "{self.pool}"')
 
@@ -205,26 +209,20 @@ class DiscriminatorOutput(nn.Module):
 class IQNDiscriminatorOutput(nn.Module):
     def __init__(self, in_dims, out_dims, norm_factory=nn.BatchNorm2d):
         super().__init__()
-        self.convs = nn.Sequential(
-            norm_factory(in_dims),
+        self.to_output = nn.Sequential(
             nn.LeakyReLU(0.2),
-            nn.Conv2d(in_dims, out_dims, 1, padding=0, bias=True)
-            # nn.Sigmoid()
+            nn.Linear(in_dims, out_dims),
         )
-        # map(nn.init.orthogonal_, self.parameters())
-        # avoid ortho init for IQN
-        feats_dims = 4 * 4 * in_dims
+        feats_dims = in_dims
         self.iqn = IQN(feats_dims)
         self.out_dims = out_dims
 
     def forward(self, feats, targets=None):
+        feats = torch.sum(feats, [2, 3])  # sum pool spatially
         feats_shape = list(feats.shape)
-        feats = feats.view(feats_shape[0], -1)
         feats_tau, taus = self.iqn(feats)
         feats_shape[0] = len(feats_tau)
-        feats_tau = feats_tau.view(*feats_shape)
-        feats = self.convs(feats_tau)
-        p_target_tau = F.avg_pool2d(feats, feats.size()[2:]).view(-1, self.out_dims)
+        p_target_tau = self.to_output(feats_tau)
         if targets is not None:
             taus = taus.repeat(1, self.out_dims)
             loss = iqn_loss(p_target_tau, targets, taus)

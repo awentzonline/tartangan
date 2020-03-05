@@ -60,10 +60,12 @@ class Generator(BlockModel):
     default_output = GeneratorOutput
 
     def build(self):
+        in_dims = self.config.blocks[0]
         blocks = [
-            self.input_factory(self.config.latent_dims, self.config.base_size)
+            self.input_factory(
+                self.config.latent_dims, in_dims, self.config.base_size
+            )
         ]
-        in_dims = self.config.latent_dims
         num_blocks_per_scale = self.config.num_blocks_per_scale
         first_block = True
         for block_i, out_dims in enumerate(self.config.blocks):
