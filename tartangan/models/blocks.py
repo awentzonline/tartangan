@@ -142,10 +142,11 @@ class GeneratorInputMLP(nn.Module):
 
 class TiledZGeneratorInput(nn.Module):
     def __init__(
-        self, latent_dims, size=4, norm_factory=nn.BatchNorm2d,
+        self, latent_dims, output_dims, size=4, norm_factory=nn.BatchNorm2d,
     ):
         super().__init__()
         self.size = size
+        assert latent_dims == output_dims
 
     def forward(self, z):
         components = z[..., None, None].repeat(1, 1, self.size, self.size)
