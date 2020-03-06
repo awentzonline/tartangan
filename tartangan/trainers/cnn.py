@@ -36,17 +36,29 @@ class CNNTrainer(Trainer):
             'mlp': GeneratorInputMLP,
             'tiledz': TiledZGeneratorInput,
         }[self.args.g_base]
+        activation_factory = {
+            'relu': functools.partial(nn.LeakyReLU, 0.2),
+            'selu': nn.SELU,
+        }[self.args.activation]
+
+        g_input_factory = functools.partial(
+            g_input_factory, activation_factory=activation_factory
+        )
         g_block_factory = functools.partial(
-            ResidualGeneratorBlock, norm_factory=norm_factory
+            ResidualGeneratorBlock, norm_factory=norm_factory,
+            activation_factory=activation_factory
         )
         d_block_factory = functools.partial(
-            ResidualDiscriminatorBlock, norm_factory=norm_factory
+            ResidualDiscriminatorBlock, norm_factory=norm_factory,
+            activation_factory=activation_factory
         )
         g_output_factory = functools.partial(
-            GeneratorOutput, norm_factory=norm_factory
+            GeneratorOutput, norm_factory=norm_factory,
+            activation_factory=activation_factory
         )
         d_output_factory = functools.partial(
-            DiscriminatorOutput, norm_factory=norm_factory
+            DiscriminatorOutput, norm_factory=norm_factory,
+            activation_factory=activation_factory
         )
         self.g = Generator(
             self.gan_config,
@@ -163,6 +175,7 @@ if __name__ == '__main__':
     p.add_argument('--tensorboard', action='store_true')
     p.add_argument('--g-base', default='mlp', help='mlp or tiledz')
     p.add_argument('--norm', default='bn', help='bn or id')
+    p.add_argument('--activation', default='selu', help='leakyrelu, selu')
     args = p.parse_args()
 
     trainer = CNNTrainer(args)

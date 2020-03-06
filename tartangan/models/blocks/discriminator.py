@@ -9,13 +9,13 @@ from ..layers import Interpolate
 
 
 class DiscriminatorInput(nn.Module):
-    def __init__(self, in_dims, out_dims):
+    def __init__(self, in_dims, out_dims,
+                 activation_factory=functools.partial(nn.LeakyReLU, 0.2)):
         super().__init__()
         self.convs = nn.Sequential(
             nn.Conv2d(in_dims, out_dims, 1, padding=0, bias=True),
-            # nn.LeakyReLU(0.2),
+            activation_factory(),
         )
-        # map(nn.init.orthogonal_, self.parameters())
 
     def forward(self, img):
         return self.convs(img)
@@ -38,7 +38,6 @@ class DiscriminatorBlock(nn.Module):
         if first_block:
             layers = layers[2:]
         self.convs = nn.Sequential(*layers)
-        # map(nn.init.orthogonal_, self.parameters())
 
     def forward(self, x):
         return self.convs(x)

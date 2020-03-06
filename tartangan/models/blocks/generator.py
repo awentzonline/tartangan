@@ -24,7 +24,6 @@ class GeneratorBlock(nn.Module):
         if upsample:
             layers.insert(0, Interpolate(scale_factor=2, mode='bilinear', align_corners=True))
         self.convs = nn.Sequential(*layers)
-        # map(nn.init.orthogonal_, self.parameters())
 
     def forward(self, x):
         return self.convs(x)
@@ -53,7 +52,6 @@ class ResidualGeneratorBlock(nn.Module):
                 nn.Conv2d(in_dims, out_dims, 1)
             )
         self.convs = nn.Sequential(*layers)
-        # map(nn.init.orthogonal_, self.parameters())
 
     def forward(self, x):
         if self.upsample:
@@ -85,6 +83,7 @@ class GeneratorInputMLP(nn.Module):
 class TiledZGeneratorInput(nn.Module):
     def __init__(
         self, latent_dims, output_dims, size=4, norm_factory=nn.BatchNorm2d,
+        **_
     ):
         super().__init__()
         self.size = size
@@ -105,7 +104,6 @@ class GeneratorOutput(nn.Module):
             nn.Conv2d(in_dims, out_dims, 1, padding=0, bias=True),
             nn.Tanh()
         )
-        # map(nn.init.orthogonal_, self.parameters())
 
     def forward(self, x):
         return self.convs(x)
