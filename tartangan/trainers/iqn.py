@@ -46,11 +46,11 @@ class IQNTrainer(Trainer):
             g_input_factory, activation_factory=activation_factory
         )
         g_block_factory = functools.partial(
-            ResidualGeneratorBlock, norm_factory=norm_factory,
+            GeneratorBlock, norm_factory=norm_factory,
             activation_factory=activation_factory
         )
         d_block_factory = functools.partial(
-            ResidualDiscriminatorBlock, norm_factory=norm_factory,
+            DiscriminatorBlock, norm_factory=norm_factory,
             activation_factory=activation_factory
         )
         g_output_factory = functools.partial(
@@ -73,7 +73,6 @@ class IQNTrainer(Trainer):
             block_factory=g_block_factory,
             output_factory=g_output_factory,
         ).to(self.device)
-        self.update_target_generator(1.)  # copy weights
 
         self.d = IQNDiscriminator(
             self.gan_config,
@@ -84,6 +83,20 @@ class IQNTrainer(Trainer):
         self.optimizer_d = torch.optim.Adam(self.d.parameters(), lr=self.args.lr_d, betas=(0., 0.999))
         print(self.g)
         print(self.d)
+        if self.args.activation == 'selu':
+            self.init_params_selu(self.g.parameters())
+            self.init_params_selu(self.d.parameters())
+        self.update_target_generator(1.)  # copy weights
+
+    def init_params_selu(self, params):
+        for p in params:
+            d = p.data
+            if len(d.shape) == 1:
+                d.zero_()
+                #d.normal_(std=1e-8)
+            else:
+                in_dims, _ = nn.init._calculate_fan_in_and_fan_out(d)
+                d.normal_(std=np.sqrt(1. / in_dims))
 
     def train_batch(self, imgs):
         imgs = imgs.to(self.device)
@@ -163,7 +176,7 @@ if __name__ == '__main__':
     p.add_argument('--tensorboard', action='store_true')
     p.add_argument('--g-base', default='mlp', help='mlp or tiledz')
     p.add_argument('--norm', default='bn', help='bn or id')
-    p.add_argument('--activation', default='selu', help='leakyrelu, selu')
+    p.add_argument('--activation', default='selu', help='relu, selu')
     args = p.parse_args()
 
     trainer = IQNTrainer(args)
