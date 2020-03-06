@@ -14,7 +14,7 @@ class DiscriminatorInput(nn.Module):
         super().__init__()
         self.convs = nn.Sequential(
             nn.Conv2d(in_dims, out_dims, 1, padding=0, bias=True),
-            activation_factory(),
+        #    activation_factory(),  # Is this blowing things up?
         )
 
     def forward(self, img):
