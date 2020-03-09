@@ -46,11 +46,11 @@ class IQNTrainer(Trainer):
             g_input_factory, activation_factory=activation_factory
         )
         g_block_factory = functools.partial(
-            GeneratorBlock, norm_factory=norm_factory,
+            ResidualGeneratorBlock, norm_factory=norm_factory,
             activation_factory=activation_factory
         )
         d_block_factory = functools.partial(
-            DiscriminatorBlock, norm_factory=norm_factory,
+            ResidualDiscriminatorBlock, norm_factory=norm_factory,
             activation_factory=activation_factory
         )
         g_output_factory = functools.partial(
