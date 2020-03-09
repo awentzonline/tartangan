@@ -1,0 +1,10 @@
+*.pyc
+checkpoints/
+sample/
+*.egg-info
+venv/
+*.pyc
+__pycache__
+*.npy
+*.gif
+node_modules/
