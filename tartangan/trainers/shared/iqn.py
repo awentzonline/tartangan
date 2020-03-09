@@ -178,7 +178,7 @@ if __name__ == '__main__':
     p.add_argument('--tensorboard', action='store_true')
     p.add_argument('--g-base', default='mlp', help='mlp or tiledz')
     p.add_argument('--norm', default='bn', help='bn or id')
-    p.add_argument('--activation', default='selu', help='relu, selu')
+    p.add_argument('--activation', default='relu', help='relu, selu')
     args = p.parse_args()
 
     trainer = IQNTrainer(args)
