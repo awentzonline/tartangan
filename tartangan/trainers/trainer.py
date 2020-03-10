@@ -5,6 +5,7 @@ import os
 
 import numpy as np
 from PIL import Image
+import smart_open
 import torch
 from torch import nn
 import torch.utils.data as data_utils
@@ -155,21 +156,26 @@ class Trainer:
 
     def output_samples(self, filename, n=None):
         with torch.no_grad():
+            # Render some random samples
             imgs = self.target_g(self.progress_samples)[:16]
             imgs_g = self.g(self.progress_samples)[:16]
             imgs = torch.cat([imgs, imgs_g], dim=0)
-            torchvision.utils.save_image(imgs, filename, normalize=True, range=(-1, 1))
+            with smart_open.open(filename, 'wb') as output_file:
+                torchvision.utils.save_image(
+                    imgs, output_file, normalize=True, range=(-1, 1), format='png'
+                )
+            # Render a grid of interpolations
             if not hasattr(self, '_latent_grid_samples'):
                 self._latent_grid_samples = self.sample_latent_grid(5, 5)
             grid_imgs = self.target_g(self._latent_grid_samples)
-            # grid_imgs_g = self.g(self._latent_grid_samples)
-            # grid_imgs = torch.cat([grid_imgs, grid_imgs_g], dim=0)
-            torchvision.utils.save_image(
-                grid_imgs, os.path.join(
-                    os.path.dirname(filename), f'grid_{os.path.basename(filename)}'
-                ), nrow=5,
-                normalize=True, range=(-1, 1),
+            grid_filename = os.path.join(
+                os.path.dirname(filename), f'grid_{os.path.basename(filename)}'
             )
+            with smart_open.open(grid_filename, 'wb') as output_file:
+                torchvision.utils.save_image(
+                    grid_imgs, output_file, nrow=5,
+                    normalize=True, range=(-1, 1), format='png'
+                )
 
     def sample_latent_grid(self, nrows, ncols):
         top_left, top_right, bottom_left, bottom_right = map(
