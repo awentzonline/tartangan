@@ -197,20 +197,25 @@ class Trainer:
         return grid
 
     def save_checkpoint(self, filename):
-        g_filename = f'{filename}_g.pt'
-        g_target_filename = f'{filename}_g_target.pt'
-        d_filename = f'{filename}_d.pt'
-        torch.save(self.g, g_filename)
-        torch.save(self.target_g, g_target_filename)
-        torch.save(self.d, d_filename)
+        model_filenames = (
+            (self.g, f'{filename}_g.pt'),
+            (self.target_g, f'{filename}_g_target.pt'),
+            (self.d, f'{filename}_d.pt')
+        )
+        for model, filename in model_filenames:
+            with smart_open.open(filename, 'wb') as outfile:
+                torch.save(model, outfile)
 
     def load_checkpoint(self, filename):
-        g_filename = f'{filename}_g.pt'
-        g_target_filename = f'{filename}_g_target.pt'
-        d_filename = f'{filename}_d.pt'
-        self.g = torch.load(g_filename)
-        self.target_g = torch.load(g_target_filename)
-        self.d = torch.load(d_filename)
+        model_filenames = (
+            ('g', f'{filename}_g.pt'),
+            ('target_g', f'{filename}_g_target.pt'),
+            ('d', f'{filename}_d.pt')
+        )
+        for model_name, model_filename in model_filenames:
+            with smart_open.open(model_filename, 'rb') as infile:
+                model = torch.load(infile)
+                setattr(self, model_name, model)
 
     @property
     def device(self):
