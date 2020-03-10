@@ -1,5 +1,6 @@
 numpy
 requests
+smart_open==1.8.3
 torch
 torchvision
 tqdm

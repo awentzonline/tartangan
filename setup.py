@@ -8,7 +8,7 @@ def read(fname):
 
 setup(
     name="tartangan",
-    version="0.0.9",
+    version="0.0.10",
     author="Adam Wentz",
     author_email="adam@adamwentz.com",
     description="Model tartan patterns with a GAN.",
@@ -24,6 +24,7 @@ setup(
     },
     install_requires=[
         'numpy',
+        'smart_open',
         'torch',
         'torchvision',
         'tqdm',

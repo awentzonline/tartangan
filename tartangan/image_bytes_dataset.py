@@ -3,6 +3,7 @@ import pickle
 
 import numpy as np
 from PIL import Image
+import smart_open
 import torch
 from torch.utils.data import Dataset
 from torchvision.datasets.folder import IMG_EXTENSIONS, default_loader
@@ -44,7 +45,8 @@ class ImageBytesDataset(Dataset):
 
     @classmethod
     def from_path(cls, path, transform=None):
-        images = np.load(path)
+        infile = smart_open.open(path, 'rb')
+        images = np.load(infile)
         return cls(images, transform=transform)
 
 
