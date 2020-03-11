@@ -26,6 +26,7 @@ from tartangan.models.blocks import (
 from tartangan.models.losses import (
     discriminator_hinge_loss, generator_hinge_loss, gradient_penalty
 )
+from .utils import set_device_from_args
 
 
 class Trainer:
@@ -242,7 +243,7 @@ if __name__ == '__main__':
     p.add_argument('--latent-dims', type=int, default=128)
     p.add_argument('--lr-g', type=float, default=1e-4)
     p.add_argument('--lr-d', type=float, default=4e-4)
-    p.add_argument('--device', default='cpu')
+    p.add_argument('--no-cuda', action='store_true')
     p.add_argument('--epochs', type=int, default=10000)
     p.add_argument('--base-size', type=int, default=4)
     p.add_argument('--base-dims', type=int, default=16)
@@ -258,6 +259,7 @@ if __name__ == '__main__':
     p.add_argument('--g-base', default='mlp', help='mlp or tiledz')
     p.add_argument('--norm', default='bn', help='bn or id')
     args = p.parse_args()
+    set_device_from_args(args)
 
     trainer = CNNTrainer(args)
     trainer.train()

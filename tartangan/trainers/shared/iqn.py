@@ -25,6 +25,7 @@ from tartangan.models.shared.pluggan import (
 )
 
 from ..trainer import Trainer
+from ..utils import set_device_from_args
 
 
 class IQNTrainer(Trainer):
@@ -164,7 +165,7 @@ if __name__ == '__main__':
     p.add_argument('--lr-g', type=float, default=1e-4)
     p.add_argument('--lr-d', type=float, default=4e-4)
     p.add_argument('--lr-target-g', type=float, default=1e-3)
-    p.add_argument('--device', default='cpu')
+    p.add_argument('--no-cuda', action='store_true')
     p.add_argument('--epochs', type=int, default=10000)
     p.add_argument('--sample-file', default='sample/tartangan')
     p.add_argument('--checkpoint-freq', type=int, default=100000)
@@ -180,6 +181,7 @@ if __name__ == '__main__':
     p.add_argument('--norm', default='bn', help='bn or id')
     p.add_argument('--activation', default='relu', help='relu, selu')
     args = p.parse_args()
+    set_device_from_args(args)
 
     trainer = IQNTrainer(args)
     trainer.train()
