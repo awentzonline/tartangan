@@ -26,7 +26,7 @@ from tartangan.models.blocks import (
 from tartangan.models.losses import (
     discriminator_hinge_loss, generator_hinge_loss, gradient_penalty
 )
-from .utils import set_device_from_args
+from .utils import set_device_from_args, toggle_grad
 
 
 class Trainer:

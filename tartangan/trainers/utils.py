@@ -8,3 +8,8 @@ def set_device_from_args(args):
     else:
         device = 'cpu'
     setattr(args, 'device', device)
+
+
+def toggle_grad(model, on_or_off):
+    for param in model.parameters():
+        param.requires_grad_(on_or_off)

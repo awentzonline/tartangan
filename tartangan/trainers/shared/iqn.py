@@ -25,7 +25,7 @@ from tartangan.models.shared.pluggan import (
 )
 
 from ..trainer import Trainer
-from ..utils import set_device_from_args
+from ..utils import set_device_from_args, toggle_grad
 
 
 class IQNTrainer(Trainer):
@@ -150,11 +150,6 @@ class IQNTrainer(Trainer):
             target_g_p.add_(
                 (g_p - target_g_p) * self.args.lr_target_g
             )
-
-
-def toggle_grad(model, on_or_off):
-  for param in model.parameters():
-    param.requires_grad_(on_or_off)
 
 
 if __name__ == '__main__':
