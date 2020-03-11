@@ -23,4 +23,4 @@ steps:
       - ${{CF_REVISION}}
       - ${{CF_BRANCH_TAG_NORMALIZED}}
     image_name: tartangan
-    registry: ecr
+    registry: ${{DOCKER_REGISTRY}}
