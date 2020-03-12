@@ -222,6 +222,42 @@ class Trainer:
     def device(self):
         return self.args.device
 
+    @classmethod
+    def create_from_cli(cls):
+        args = cls.parse_cli_args()
+        set_device_from_args(args)
+        return cls(args)
+
+    @classmethod
+    def parse_cli_args(cls):
+        p = argparse.ArgumentParser(description='TartanGAN trainer')
+        cls.add_args_to_parser(p)
+        return p.parse_args()
+
+    @classmethod
+    def add_args_to_parser(cls, p):
+        p.add_argument('data_path')
+        p.add_argument('--batch-size', type=int, default=128)
+        p.add_argument('--gen-freq', type=int, default=200)
+        p.add_argument('--lr-g', type=float, default=1e-4)
+        p.add_argument('--lr-d', type=float, default=4e-4)
+        p.add_argument('--lr-target-g', type=float, default=1e-3)
+        p.add_argument('--no-cuda', action='store_true')
+        p.add_argument('--epochs', type=int, default=10000)
+        p.add_argument('--sample-file', default='sample/tartangan')
+        p.add_argument('--checkpoint-freq', type=int, default=100000)
+        p.add_argument('--checkpoint', default='checkpoints/tartangan')
+        p.add_argument('--dataset-cache', default='cache/{root}_{size}.pkl')
+        p.add_argument('--grad-penalty', type=float, default=5.)
+        p.add_argument('--config', default='64')
+        p.add_argument('--model-scale', type=float, default=1.)
+        p.add_argument('--cache-dataset', action='store_true')
+        p.add_argument('--log-dir', default='runs')
+        p.add_argument('--tensorboard', action='store_true')
+        p.add_argument('--g-base', default='mlp', help='mlp or tiledz')
+        p.add_argument('--norm', default='bn', help='bn or id')
+        p.add_argument('--activation', default='relu', help='relu, selu')
+
 
 def slerp(val, low, high):
     """
@@ -235,31 +271,5 @@ def slerp(val, low, high):
 
 
 if __name__ == '__main__':
-    p = argparse.ArgumentParser()
-    p.add_argument('data_path')
-    p.add_argument('--batch-size', type=int, default=128)
-    p.add_argument('--gen-freq', type=int, default=200)
-    p.add_argument('--img-size', type=int, default=128)
-    p.add_argument('--latent-dims', type=int, default=128)
-    p.add_argument('--lr-g', type=float, default=1e-4)
-    p.add_argument('--lr-d', type=float, default=4e-4)
-    p.add_argument('--no-cuda', action='store_true')
-    p.add_argument('--epochs', type=int, default=10000)
-    p.add_argument('--base-size', type=int, default=4)
-    p.add_argument('--base-dims', type=int, default=16)
-    p.add_argument('--sample-file', default='sample/tartangan')
-    p.add_argument('--checkpoint-freq', type=int, default=100000)
-    p.add_argument('--checkpoint', default='checkpoints/tartangan')
-    p.add_argument('--dataset-cache', default='cache/{root}_{size}.pkl')
-    p.add_argument('--grad-penalty', type=float, default=5.)
-    p.add_argument('--model-scale', type=float, default=1.)
-    p.add_argument('--cache-dataset', action='store_true')
-    p.add_argument('--log-dir', default='runs')
-    p.add_argument('--tensorboard', action='store_true')
-    p.add_argument('--g-base', default='mlp', help='mlp or tiledz')
-    p.add_argument('--norm', default='bn', help='bn or id')
-    args = p.parse_args()
-    set_device_from_args(args)
-
-    trainer = CNNTrainer(args)
+    trainer = Trainer.create_from_cli()
     trainer.train()
