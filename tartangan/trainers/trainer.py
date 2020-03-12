@@ -234,6 +234,7 @@ class Trainer:
     def create_from_cli(cls):
         args = cls.parse_cli_args()
         set_device_from_args(args)
+        print(f'Using device "{args.device}"')
         return cls(args)
 
     @classmethod
