@@ -4,38 +4,32 @@ import torch.nn.functional as F
 
 
 class SelfAttention2d(nn.Module):
-    """
-    Follows https://github.com/heykeetae/Self-Attention-GAN/blob/master/sagan_models.py
-    """
-    def __init__(self, in_dims, attention_dims=None):
-        super().__init__()
-        if attention_dims is None:
-            attention_dims = in_dims // 8
-        self.attention_dims = attention_dims
-        self.query = nn.Sequential(
-            nn.Conv2d(in_dims, attention_dims, 1, padding=0),
-        )
-        self.key = nn.Sequential(
-            nn.Conv2d(in_dims, attention_dims, 1, padding=0),
-        )
-        self.value = nn.Sequential(
-            nn.Conv2d(in_dims, in_dims, 1, padding=0),
-        )
-        self.gamma = nn.Parameter(
-            torch.zeros(1), requires_grad=True
-        )
+  """
+  Adapted from https://github.com/ajbrock/BigGAN-PyTorch/blob/master/layers.py
+  """
+  def __init__(self, in_dims, attention_dims=None):
+    super().__init__()
+    # Channel multiplier
+    self.in_dims = in_dims
+    self.theta = nn.Conv2d(in_dims, in_dims // 8, 1, bias=False)
+    self.phi = nn.Conv2d(in_dims, in_dims // 8, 1, bias=False)
+    self.g = nn.Conv2d(in_dims, in_dims // 2, 1, bias=False)
+    self.o = nn.Conv2d(in_dims // 2, in_dims, 1, bias=False)
+    # Learnable gain parameter
+    self.gamma = nn.Parameter(torch.tensor(0.), requires_grad=True)
 
-    def forward(self, x):
-        batch, channels, height, width = x.shape
-        q = self.query(x)
-        k = self.key(x)
-        v = self.value(x)
-        q = q.view(batch, self.attention_dims, -1)
-        k = k.view(batch, self.attention_dims, -1)
-        v = v.view(batch, channels, -1)
-        q = q.permute((0, 2, 1))
-        attention = torch.matmul(q, k)
-        attention = F.softmax(attention, dim=-1)
-        attended = torch.matmul(v, attention.permute(0, 2, 1))
-        attended = attended.view(batch, channels, height, width)
-        return self.gamma * attended + x
+  def forward(self, x, y=None):
+    batch, channels, height, width = x.shape
+    # Apply convs
+    theta = self.theta(x)
+    phi = F.max_pool2d(self.phi(x), [2, 2])
+    g = F.max_pool2d(self.g(x), [2, 2])
+    # Perform reshapes
+    theta = theta.view(-1, self.in_dims // 8, height * width)
+    phi = phi.view(-1, self.in_dims // 8, height * width // 4)
+    g = g.view(-1, self.in_dims // 2, height * width // 4)
+    # Matmul and softmax to get attention maps
+    beta = F.softmax(torch.bmm(theta.transpose(1, 2), phi), -1)
+    # Attention map times g path
+    o = self.o(torch.bmm(g, beta.transpose(1,2)).view(-1, self.in_dims // 2, height, width))
+    return self.gamma * o + x
