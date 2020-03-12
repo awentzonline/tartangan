@@ -75,12 +75,12 @@ class Trainer:
         )
         steps = 0
         for epoch_i in range(self.args.epochs):
-            loader_iter = tqdm.tqdm(train_loader)
+            loader_iter = tqdm.tqdm(train_loader, **self.tqdm_kwargs())
             for batch_i, images in enumerate(loader_iter):
                 metrics = self.train_batch(images)
                 self.log_metrics(metrics, steps)
                 round_metrics = {k: round(v, 4) for k, v in metrics.items()}
-                loader_iter.set_postfix(**round_metrics)
+                loader_iter.set_postfix(refresh=False, **round_metrics)
                 steps += 1
                 if steps % self.args.gen_freq == 0:
                     self.output_samples(f'{self.args.sample_file}_{steps}.png')
@@ -218,6 +218,14 @@ class Trainer:
                 model = torch.load(infile)
                 setattr(self, model_name, model)
 
+    def tqdm_kwargs(self):
+        if not self.args.quiet_logs:
+            return {}
+        else:
+            return dict(
+                mininterval=0, maxinterval=np.inf, miniters=self.args.log_iters
+            )
+
     @property
     def device(self):
         return self.args.device
@@ -257,6 +265,9 @@ class Trainer:
         p.add_argument('--g-base', default='mlp', help='mlp or tiledz')
         p.add_argument('--norm', default='bn', help='bn or id')
         p.add_argument('--activation', default='relu', help='relu, selu')
+        p.add_argument('--quiet-logs', action='store_true', help='Reduce log output')
+        p.add_argument('--log-iters', type=int, default=1000,
+                       help='Progress logging frequency when --quiet-logs are enabled')
 
 
 def slerp(val, low, high):
