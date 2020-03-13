@@ -26,6 +26,7 @@ from tartangan.models.blocks import (
 from tartangan.models.losses import (
     discriminator_hinge_loss, generator_hinge_loss, gradient_penalty
 )
+from .tqdm_newlines import TqdmNewLines
 from .utils import set_device_from_args, toggle_grad
 
 
@@ -69,13 +70,14 @@ class Trainer:
         os.makedirs(os.path.dirname(self.args.checkpoint), exist_ok=True)
         self.build_models()
         self.progress_samples = self.sample_z(32)
+        print(f'Preparing dataset from {self.args.data_path}')
         self.dataset = self.prepare_dataset()
         train_loader = data_utils.DataLoader(
             self.dataset, batch_size=self.args.batch_size, shuffle=True, drop_last=True
         )
         steps = 0
         for epoch_i in range(self.args.epochs):
-            loader_iter = tqdm.tqdm(train_loader, **self.tqdm_kwargs())
+            loader_iter = self.tqdm_class()(train_loader, **self.tqdm_kwargs())
             for batch_i, images in enumerate(loader_iter):
                 metrics = self.train_batch(images)
                 self.log_metrics(metrics, steps)
@@ -218,6 +220,12 @@ class Trainer:
                 model = torch.load(infile)
                 setattr(self, model_name, model)
 
+    def tqdm_class(self):
+        if self.args.log_progress_newlines:
+            return TqdmNewLines
+        else:
+            return tqdm.tqdm
+
     def tqdm_kwargs(self):
         if not self.args.quiet_logs:
             return {}
@@ -269,6 +277,8 @@ class Trainer:
         p.add_argument('--quiet-logs', action='store_true', help='Reduce log output')
         p.add_argument('--log-iters', type=int, default=1000,
                        help='Progress logging frequency when --quiet-logs are enabled')
+        p.add_argument('--log-progress-newlines', action='store_true',
+                       help='Log progress updates one per line')
 
 
 def slerp(val, low, high):
