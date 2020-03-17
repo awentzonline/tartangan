@@ -9,16 +9,13 @@
  Note that if you don't shuffle the data, the IS of true data will be under-
  estimated as it is label-ordered. By default, the data is not shuffled
  so as to reduce non-determinism. '''
-from argparse import ArgumentParser
-
 import numpy as np
 import smart_open
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
 import torch.utils.data as data_utils
 from torchvision import transforms
-from tqdm import tqdm, trange
+from tqdm import tqdm
 
 from .image_bytes_dataset import ImageBytesDataset
 from . import inception_utils
@@ -28,7 +25,7 @@ def calculate_inception_moments(loader):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     net = inception_utils.load_inception_net(parallel=False)
     net = net.to(device)
-    pool, logits, labels = [], [], []
+    pool, logits = [], []
     for i, x in enumerate(tqdm(loader)):
         x = x.to(device)
         with torch.no_grad():
@@ -71,4 +68,4 @@ if __name__ == '__main__':
     mu, sigma = calculate_inception_moments(loader)
     print('Saving calculated means and covariances to disk...')
     with smart_open.open(args.destination, 'wb') as outfile:
-        np.savez(outfile, **{'mu' : mu, 'sigma' : sigma})
+        np.savez(outfile, mu=mu, sigma=sigma)
