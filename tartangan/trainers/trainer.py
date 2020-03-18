@@ -27,7 +27,8 @@ from tartangan.models.losses import (
     discriminator_hinge_loss, generator_hinge_loss, gradient_penalty
 )
 from .tqdm_newlines import TqdmNewLines
-from .utils import set_device_from_args, toggle_grad
+from .utils import set_device_from_args
+from  .. import inception_utils
 
 
 class Trainer:
@@ -63,6 +64,9 @@ class Trainer:
             dataset = ImageBytesDataset.from_path(
                 self.args.data_path, transform=transform
             )
+        self.get_inception_metrics = inception_utils.prepare_inception_metrics(
+            self.args.inception_moments, self.device, False
+        )
         return dataset
 
     def train(self):
@@ -179,6 +183,8 @@ class Trainer:
                     grid_imgs, output_file, nrow=5,
                     normalize=True, range=(-1, 1), format='png'
                 )
+            # calculate metrics
+            self.eval_inception_metrics(imgs_g)
 
     def sample_latent_grid(self, nrows, ncols):
         top_left, top_right, bottom_left, bottom_right = map(
@@ -233,6 +239,14 @@ class Trainer:
             return dict(
                 mininterval=0, maxinterval=np.inf, miniters=self.args.log_iters
             )
+
+    def eval_inception_metrics(self, sample):
+        """Calculate inception metrics"""
+        is_mean, is_std, fid = self.get_inception_metrics(
+            self.sample_g, self.args.n_inception_imgs, num_splits=5
+        )
+        print('Inception Score is %3.3f +/- %3.3f' % (is_mean, is_std))
+        print('FID is %5.4f' % (fid,))
 
     @property
     def device(self):
@@ -296,6 +310,9 @@ class Trainer:
                        help='Progress logging frequency when --quiet-logs are enabled')
         p.add_argument('--log-progress-newlines', action='store_true',
                        help='Log progress updates one per line')
+        p.add_argument('--inception-moments', default=None,
+                       help='Path to pre-calculated inception moments')
+        p.add_argument('--n-inception-imgs', default=1000, type=int)
 
 
 def slerp(val, low, high):

@@ -18,6 +18,7 @@ import time
 
 import numpy as np
 from scipy import linalg  # For numpy FID
+import smart_open
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -242,18 +243,16 @@ def calculate_inception_score(pred, num_splits=10):
 
 
 # Loop and run the sampler and the net until it accumulates num_inception_images
-# activations. Return the pool, the logits, and the labels (if one wants
-# Inception Accuracy the labels of the generated class will be needed)
+# activations. Return the pool and the logits.
 def accumulate_inception_activations(sample, net, num_inception_images=50000):
-  pool, logits, labels = [], [], []
+  pool, logits = [], []
   while (torch.cat(logits, 0).shape[0] if len(logits) else 0) < num_inception_images:
     with torch.no_grad():
-      images, labels_val = sample()
+      images = sample()
       pool_val, logits_val = net(images.float())
       pool += [pool_val]
       logits += [F.softmax(logits_val, 1)]
-      labels += [labels_val]
-  return torch.cat(pool, 0), torch.cat(logits, 0), torch.cat(labels, 0)
+  return torch.cat(pool, 0), torch.cat(logits, 0)
 
 
 # Load and wrap the Inception model
@@ -270,20 +269,20 @@ def load_inception_net(parallel=False):
 # and iterates until it accumulates config['num_inception_images'] images.
 # The iterator can return samples with a different batch size than used in
 # training, using the setting confg['inception_batchsize']
-def prepare_inception_metrics(dataset, parallel, no_fid=False):
+def prepare_inception_metrics(moments_path, device, parallel, no_fid=False):
   # Load metrics; this is intentionally not in a try-except loop so that
   # the script will crash here if it cannot find the Inception moments.
-  # By default, remove the "hdf5" from dataset
-  dataset = dataset.strip('_hdf5')
-  data_mu = np.load(dataset+'_inception_moments.npz')['mu']
-  data_sigma = np.load(dataset+'_inception_moments.npz')['sigma']
+  with smart_open.open(moments_path, 'rb') as infile:
+      data = np.load(infile)
+      data_mu = data['mu']
+      data_sigma = data['sigma']
   # Load network
-  net = load_inception_net(parallel)
+  net = load_inception_net(parallel).to(device)
   def get_inception_metrics(sample, num_inception_images, num_splits=10,
                             prints=True, use_torch=True):
     if prints:
       print('Gathering activations...')
-    pool, logits, labels = accumulate_inception_activations(sample, net, num_inception_images)
+    pool, logits = accumulate_inception_activations(sample, net, num_inception_images)
     if prints:
       print('Calculating Inception Score...')
     IS_mean, IS_std = calculate_inception_score(logits.cpu().numpy(), num_splits)
@@ -299,11 +298,14 @@ def prepare_inception_metrics(dataset, parallel, no_fid=False):
       if prints:
         print('Covariances calculated, getting FID...')
       if use_torch:
-        FID = torch_calculate_frechet_distance(mu, sigma, torch.tensor(data_mu).float().cuda(), torch.tensor(data_sigma).float().cuda())
+        FID = torch_calculate_frechet_distance(
+            mu, sigma, torch.tensor(data_mu).float().to(device),
+            torch.tensor(data_sigma).float().to(device)
+        )
         FID = float(FID.cpu().numpy())
       else:
-        FID = numpy_calculate_frechet_distance(mu.cpu().numpy(), sigma.cpu().numpy(), data_mu, data_sigma)
-    # Delete mu, sigma, pool, logits, and labels, just in case
-    del mu, sigma, pool, logits, labels
+        FID = numpy_calculate_frechet_distance(mu, sigma, data_mu, data_sigma)
+    # Delete mu, sigma, and pool, just in case
+    del mu, sigma, pool, logits
     return IS_mean, IS_std, FID
   return get_inception_metrics
