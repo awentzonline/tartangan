@@ -26,6 +26,10 @@ from torch.nn import Parameter as P
 from torchvision.models.inception import inception_v3
 
 
+VGG_MEAN = torch.tensor([0.485, 0.456, 0.406])[..., None, None]
+VGG_STD = torch.tensor([0.229, 0.224, 0.225])[..., None, None]
+
+
 # Module that wraps the inception network to enable use with dataparallel and
 # returning pool features and logits.
 class WrapInception(nn.Module):
@@ -242,13 +246,22 @@ def calculate_inception_score(pred, num_splits=10):
   return np.mean(scores), np.std(scores)
 
 
-# Loop and run the sampler and the net until it accumulates num_inception_images
-# activations. Return the pool and the logits.
 def accumulate_inception_activations(sample, net, num_inception_images=50000):
+  """
+  Loop and run the sampler and the net until it accumulates num_inception_images
+  activations. Return the pool and the logits.
+  """
+  def transform(s):
+      """Our GAN outputs are in [-1, 1]"""
+      s = (s + 1) / 2.
+      s = (s - VGG_MEAN) / VGG_STD
+      return s
+
   pool, logits = [], []
   while (torch.cat(logits, 0).shape[0] if len(logits) else 0) < num_inception_images:
     with torch.no_grad():
       images = sample()
+      images = transform(images)
       pool_val, logits_val = net(images.float())
       pool += [pool_val]
       logits += [F.softmax(logits_val, 1)]
