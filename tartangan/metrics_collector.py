@@ -1,6 +1,6 @@
 import abc
-from collections import defaultdict
 import json
+import os
 
 import smart_open
 
@@ -32,6 +32,7 @@ class KubeflowMetricsCollector(MetricsCollector):
                 for key, value in self.values.items()
             ]
         )
+        os.makedirs(os.path.dirname(self.output_path), exist_ok=True)
         with smart_open.open(self.output_path, 'w') as outfile:
             json.dump(output, outfile)
 
