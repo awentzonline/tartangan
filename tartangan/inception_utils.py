@@ -229,7 +229,7 @@ def torch_calculate_frechet_distance(mu1, sigma1, mu2, sigma2, eps=1e-6):
 
   diff = mu1 - mu2
   # Run 50 itrs of newton-schulz to get the matrix sqrt of sigma1 dot sigma2
-  covmean = sqrt_newton_schulz(sigma1.mm(sigma2).unsqueeze(0), 50).squeeze()
+  covmean = sqrt_newton_schulz(sigma1.mm(sigma2).unsqueeze(0), 20).squeeze()
   out = (diff.dot(diff) +  torch.trace(sigma1) + torch.trace(sigma2)
          - 2 * torch.trace(covmean))
   return out
