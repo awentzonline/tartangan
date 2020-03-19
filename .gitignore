@@ -11,3 +11,4 @@ checkpoint/
 *.pt
 *.log
 .DS_Store
+*.pyc
