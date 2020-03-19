@@ -64,10 +64,13 @@ class Trainer:
             dataset = ImageBytesDataset.from_path(
                 self.args.data_path, transform=transform
             )
-        if self.args.inception_moments is not None:
+        # setup for output quality metrics
+        if self.args.inception_moments and self.args.inception_moments != 'None':
             self.get_inception_metrics = inception_utils.prepare_inception_metrics(
                 self.args.inception_moments, self.device, False
             )
+        else:
+            self.get_inception_metrics = None
         return dataset
 
     def train(self):
@@ -248,7 +251,7 @@ class Trainer:
 
     def calculate_metrics(self):
         """Calculate inception metrics"""
-        if self.args.inception_moments:
+        if self.get_inception_metrics:
             is_mean, is_std, fid = self.get_inception_metrics(
                 self.sample_g, self.args.n_inception_imgs, num_splits=5
             )
@@ -324,7 +327,7 @@ class Trainer:
                        help='Log progress updates one per line')
         p.add_argument('--test-freq', default=10000, type=int,
                        help='Calculate test metrics every N batches')
-        p.add_argument('--inception-moments', default=None,
+        p.add_argument('--inception-moments', default='None',
                        help='Path to pre-calculated inception moments')
         p.add_argument('--n-inception-imgs', default=1000, type=int)
         p.add_argument('--metrics-path', default=None,
