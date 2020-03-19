@@ -150,6 +150,10 @@ class IQNTrainer(Trainer):
             )
 
 
-if __name__ == '__main__':
+def main():
     trainer = IQNTrainer.create_from_cli()
     trainer.train()
+
+
+if __name__ == '__main__':
+    main()

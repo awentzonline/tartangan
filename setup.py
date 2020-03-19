@@ -8,7 +8,7 @@ def read(fname):
 
 setup(
     name="tartangan",
-    version="0.0.10",
+    version="0.1.0",
     author="Adam Wentz",
     author_email="adam@adamwentz.com",
     description="Model tartan patterns with a GAN.",
@@ -19,7 +19,8 @@ setup(
     entry_points={
         "console_scripts": [
             "tartangan_scrape = tartangan.scraper:main",
-            "tartangan_train = tartangan.trainers.iqn:main"
+            "tartangan_train_cnn = tartangan.trainers.cnn:main",
+            "tartangan_train_iqn = tartangan.trainers.iqn:main",
         ]
     },
     install_requires=[
