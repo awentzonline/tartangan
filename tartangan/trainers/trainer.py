@@ -19,13 +19,7 @@ import tqdm
 
 from tartangan.image_bytes_dataset import ImageBytesDataset
 from tartangan.image_folder_dataset import ImageFolderDataset
-from tartangan.models.blocks import (
-    ResidualDiscriminatorBlock, ResidualGeneratorBlock,
-    GeneratorInputMLP, TiledZGeneratorInput
-)
-from tartangan.models.losses import (
-    discriminator_hinge_loss, generator_hinge_loss, gradient_penalty
-)
+from tartangan.metrics_collector import KubeflowMetricsCollector
 from .tqdm_newlines import TqdmNewLines
 from .utils import set_device_from_args
 from  .. import inception_utils
@@ -37,6 +31,12 @@ class Trainer:
         self.summary_writer = None
         if self.args.tensorboard:
             self.summary_writer = SummaryWriter()
+        if self.args.metrics_path:
+            self.metrics_collector = KubeflowMetricsCollector(
+                self.args.metrics_path
+            )
+        else:
+            self.metrics_collector = None
 
     def build_models(self):
         pass
@@ -81,23 +81,28 @@ class Trainer:
             self.dataset, batch_size=self.args.batch_size, shuffle=True, drop_last=True
         )
         steps = 0
-        for epoch_i in range(self.args.epochs):
-            loader_iter = self.tqdm_class()(train_loader, **self.tqdm_kwargs())
-            for batch_i, images in enumerate(loader_iter):
-                metrics = self.train_batch(images)
-                self.log_metrics(metrics, steps)
-                round_metrics = {k: round(v, 4) for k, v in metrics.items()}
-                loader_iter.set_postfix(refresh=False, **round_metrics)
-                steps += 1
-                if steps % self.args.gen_freq == 0:
-                    self.output_samples(f'{self.args.sample_file}_{steps}.png')
-                if steps % self.args.checkpoint_freq == 0:
-                    self.save_checkpoint(f'{self.args.checkpoint}_{steps}')
-                if steps % self.args.test_freq == 0:
-                    self.calculate_metrics()
-            if epoch_i == 0 and self.args.cache_dataset:
-                if hasattr(self.dataset, 'save_cache'):
-                    self.dataset.save_cache(self.dataset_cache_path(img_size))
+        try:
+            for epoch_i in range(self.args.epochs):
+                loader_iter = self.tqdm_class()(train_loader, **self.tqdm_kwargs())
+                for batch_i, images in enumerate(loader_iter):
+                    metrics = self.train_batch(images)
+                    self.log_metrics(metrics, steps)
+                    round_metrics = {k: round(v, 4) for k, v in metrics.items()}
+                    loader_iter.set_postfix(refresh=False, **round_metrics)
+                    steps += 1
+                    if steps % self.args.gen_freq == 0:
+                        self.output_samples(f'{self.args.sample_file}_{steps}.png')
+                    if steps % self.args.checkpoint_freq == 0:
+                        self.save_checkpoint(f'{self.args.checkpoint}_{steps}')
+                    if steps % self.args.test_freq == 0:
+                        self.calculate_metrics()
+                if epoch_i == 0 and self.args.cache_dataset:
+                    if hasattr(self.dataset, 'save_cache'):
+                        self.dataset.save_cache(self.dataset_cache_path(img_size))
+        except KeyboardInterrupt:
+            pass
+        if self.metrics_collector:
+            self.metrics_collector.flush()
 
     def dataset_cache_path(self, size):
         root_hash = hashlib.md5(self.dataset.root.encode('utf-8')).hexdigest()
@@ -243,12 +248,17 @@ class Trainer:
 
     def calculate_metrics(self):
         """Calculate inception metrics"""
-        if self.args.inception_moments is not None:
+        if self.args.inception_moments:
             is_mean, is_std, fid = self.get_inception_metrics(
                 self.sample_g, self.args.n_inception_imgs, num_splits=5
             )
             print('Inception Score is %3.3f +/- %3.3f' % (is_mean, is_std))
             print('FID is %5.4f' % (fid,))
+            if self.metrics_collector:
+                self.metrics_collector.add_scalar('fid', fid)
+                self.metrics_collector.add_scalar('inception_score_mean', is_mean)
+                self.metrics_collector.add_scalar('inception_score_std', is_std)
+
 
     @property
     def device(self):
@@ -317,6 +327,8 @@ class Trainer:
         p.add_argument('--inception-moments', default=None,
                        help='Path to pre-calculated inception moments')
         p.add_argument('--n-inception-imgs', default=1000, type=int)
+        p.add_argument('--metrics-path', default=None,
+                       help='Where to output a file containing run metrics')
 
 
 def slerp(val, low, high):
