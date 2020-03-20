@@ -291,6 +291,10 @@ def prepare_inception_metrics(moments_path, device, parallel, no_fid=False):
       data_sigma = data['sigma']
   # Load network
   net = load_inception_net(parallel).to(device)
+  global VGG_STD, VGG_MEAN  # you love it
+  VGG_STD = VGG_STD.to(device)
+  VGG_MEAN = VGG_MEAN.to(device)
+
   def get_inception_metrics(sample, num_inception_images, num_splits=10,
                             prints=True, use_torch=True):
     if prints:
