@@ -29,3 +29,15 @@ Training
  * `python -m tartangan.trainers.cnn $DATASET` to train a SA-GAN alike model
  * `python -m tartangan.trainers.iqn $DATASET` to train a SA-GAN-IQN model
  * There are many CLI options for the trainer. Run with `--help` for more information.
+
+Test metrics
+------------
+I've adapted code from the excellent [BigGAN](https://github.com/ajbrock/BigGAN-PyTorch) to calculate the Inception Score and Frechet Inception Distance, popular measures of how closely the generator output matches the real data.
+
+First precalculate the inception moments of the dataset with:
+
+`python3 -m tartangan.calculate_inception_moments $DATASET $IM_FILENAME`
+
+Then run the trainer with the `--inception-moments=$IM_FILENAME` argument. Calculating these takes a bit of time. You can choose how frequently to run the tests with `--test-freq` and the number of samples drawn from the generator with `--n-inception-imgs`.
+
+The scores will be printed during training and you can choose to have it output final scores to a JSON-encoded file with `--metrics-path`. Currently, this file is formatted for use with scalar metrics in a [Kubeflow Pipeline](https://www.kubeflow.org/docs/pipelines/overview/pipelines-overview/).
