@@ -34,7 +34,7 @@ class KubeflowMetricsCollector(MetricsCollector):
         )
         os.makedirs(os.path.dirname(self.output_path), exist_ok=True)
         with smart_open.open(self.output_path, 'w') as outfile:
-            json.dump(output, outfile)
+            json.dump(output, outfile, indent=2)
 
 
 def key_to_kf_metric_name(k):
