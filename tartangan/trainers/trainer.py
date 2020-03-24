@@ -19,7 +19,8 @@ import tqdm
 
 from tartangan.image_bytes_dataset import ImageBytesDataset
 from tartangan.image_folder_dataset import ImageFolderDataset
-from tartangan.metrics_collector import KubeflowMetricsCollector
+from tartangan.metrics_collector import (
+    KatibMetricsCollector, KubeflowMetricsCollector)
 from .tqdm_newlines import TqdmNewLines
 from .utils import set_device_from_args
 from  .. import inception_utils
@@ -32,7 +33,11 @@ class Trainer:
         if self.args.tensorboard:
             self.summary_writer = SummaryWriter()
         if self.args.metrics_path:
-            self.metrics_collector = KubeflowMetricsCollector(
+            metrics_collector_class = {
+                'katib': KatibMetricsCollector,
+                'kubeflow': KubeflowMetricsCollector,
+            }[self.args.metrics_collector]
+            self.metrics_collector = metrics_collector_class(
                 self.args.metrics_path
             )
         else:
@@ -336,6 +341,8 @@ class Trainer:
         p.add_argument('--n-inception-imgs', default=1000, type=int)
         p.add_argument('--metrics-path', default=None,
                        help='Where to output a file containing run metrics')
+        p.add_argument('--metrics-collector', default='katib',
+                       help='Which metric collector to use (katib, kubeflow)')
 
 
 def slerp(val, low, high):
