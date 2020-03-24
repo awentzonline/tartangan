@@ -93,19 +93,23 @@ class Trainer:
                     round_metrics = {k: round(v, 4) for k, v in metrics.items()}
                     loader_iter.set_postfix(refresh=False, **round_metrics)
                     steps += 1
-                    if steps % self.args.gen_freq == 0:
-                        self.output_samples(f'{self.args.sample_file}_{steps}.png')
-                    if steps % self.args.checkpoint_freq == 0:
-                        self.save_checkpoint(f'{self.args.checkpoint}_{steps}')
-                    if steps % self.args.test_freq == 0:
-                        self.calculate_metrics()
+                    self.periodic_tasks(steps)
                 if epoch_i == 0 and self.args.cache_dataset:
                     if hasattr(self.dataset, 'save_cache'):
                         self.dataset.save_cache(self.dataset_cache_path(img_size))
         except KeyboardInterrupt:
             pass
+        self.periodic_tasks(steps, final=True)
         if self.metrics_collector:
             self.metrics_collector.flush()
+
+    def periodic_tasks(self, steps, final=False):
+        if steps % self.args.gen_freq == 0 or final:
+            self.output_samples(f'{self.args.sample_file}_{steps}.png')
+        if steps % self.args.checkpoint_freq == 0 or final:
+            self.save_checkpoint(f'{self.args.checkpoint}_{steps}')
+        if steps % self.args.test_freq == 0 or final:
+            self.calculate_metrics()
 
     def dataset_cache_path(self, size):
         root_hash = hashlib.md5(self.dataset.root.encode('utf-8')).hexdigest()
