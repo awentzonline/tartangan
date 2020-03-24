@@ -341,7 +341,7 @@ class Trainer:
         p.add_argument('--n-inception-imgs', default=1000, type=int)
         p.add_argument('--metrics-path', default=None,
                        help='Where to output a file containing run metrics')
-        p.add_argument('--metrics-collector', default='katib',
+        p.add_argument('--metrics-collector', default='kubeflow',
                        help='Which metric collector to use (katib, kubeflow)')
 
 
