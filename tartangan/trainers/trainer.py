@@ -20,21 +20,26 @@ from tartangan.image_bytes_dataset import ImageBytesDataset
 from tartangan.image_folder_dataset import ImageFolderDataset
 from tartangan.metrics_collector import (
     KatibMetricsCollector, KubeflowMetricsCollector)
+from tartangan.utils.cli import save_cli_arguments
 from .components.container import ComponentContainer
 from .components.model_checkpoint import ModelCheckpointComponent
 from .components.image_sampler import ImageSamplerComponent
 from .tqdm_newlines import TqdmNewLines
 from .utils import set_device_from_args
-from  .. import inception_utils
+from .. import inception_utils
 
 
 class Trainer:
     def __init__(self, args):
         self.args = args
-        self.summary_writer = None
         self.run_id = self._generate_run_id()
+        os.makedirs(self.output_root, exist_ok=True)
+        self._save_cli_arguments()
+
+        self.summary_writer = None
         if self.args.tensorboard:
             self.summary_writer = SummaryWriter()
+
         if self.args.metrics_path:
             metrics_collector_class = {
                 'katib': KatibMetricsCollector,
@@ -45,6 +50,7 @@ class Trainer:
             )
         else:
             self.metrics_collector = None
+
         self.components = ComponentContainer()
         self.components.trainer = self
 
@@ -225,6 +231,9 @@ class Trainer:
                 self.metrics_collector.add_scalar('inception_score_mean', is_mean)
                 self.metrics_collector.add_scalar('inception_score_std', is_std)
 
+    def _save_cli_arguments(self):
+        save_cli_arguments(f'{self.output_root}/config.args')
+
     @property
     def device(self):
         return self.args.device
@@ -242,7 +251,9 @@ class Trainer:
 
     @classmethod
     def parse_cli_args(cls):
-        p = argparse.ArgumentParser(description='TartanGAN trainer')
+        p = argparse.ArgumentParser(
+            description='TartanGAN trainer', fromfile_prefix_chars='@'
+        )
         cls.add_args_to_parser(p)
         return p.parse_args()
 
