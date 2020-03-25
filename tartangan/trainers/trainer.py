@@ -1,6 +1,5 @@
 import argparse
 from datetime import datetime
-import functools
 import hashlib
 import os
 import random
@@ -8,15 +7,12 @@ import string
 
 import numpy as np
 from PIL import Image
-import smart_open
 import torch
-from torch import nn
 import torch.utils.data as data_utils
 try:
     from torch.utils.tensorboard import SummaryWriter
 except ImportError:
     print('Tensorboard not available.')
-import torchvision
 from torchvision import transforms
 import tqdm
 
@@ -26,6 +22,7 @@ from tartangan.metrics_collector import (
     KatibMetricsCollector, KubeflowMetricsCollector)
 from .components.container import ComponentContainer
 from .components.model_checkpoint import ModelCheckpointComponent
+from .components.image_sampler import ImageSamplerComponent
 from .tqdm_newlines import TqdmNewLines
 from .utils import set_device_from_args
 from  .. import inception_utils
@@ -61,7 +58,7 @@ class Trainer:
 
     def setup_components(self):
         self.components.add_components(
-            ModelCheckpointComponent(),
+            ImageSamplerComponent(), ModelCheckpointComponent(),
         )
 
     def prepare_dataset(self):
@@ -97,9 +94,7 @@ class Trainer:
         return dataset
 
     def train(self):
-        os.makedirs(os.path.dirname(self.sample_root + '/'), exist_ok=True)
         self.build_models()
-        self.progress_samples = self.sample_z(32)
         print(f'Preparing dataset from {self.args.data_path}')
         self.dataset = self.prepare_dataset()
         train_loader = data_utils.DataLoader(
@@ -135,8 +130,6 @@ class Trainer:
             self.metrics_collector.flush()
 
     def periodic_tasks(self, steps, final=False):
-        if steps % self.args.gen_freq == 0 or final:
-            self.output_samples(f'{self.sample_root}/sample_{steps}.png')
         if steps % self.args.test_freq == 0 or final:
             self.calculate_metrics()
 
@@ -205,48 +198,6 @@ class Trainer:
         labels = torch.ones(len(generated_data), 1).to(self.device)
         return generated_data, labels
 
-    def output_samples(self, filename, n=None):
-        with torch.no_grad():
-            # Render some random samples
-            imgs = self.target_g(self.progress_samples)[:16]
-            imgs_g = self.g(self.progress_samples)[:16]
-            imgs = torch.cat([imgs, imgs_g], dim=0)
-            with smart_open.open(filename, 'wb') as output_file:
-                torchvision.utils.save_image(
-                    imgs, output_file, normalize=True, range=(-1, 1), format='png'
-                )
-            # Render a grid of interpolations
-            if not hasattr(self, '_latent_grid_samples'):
-                self._latent_grid_samples = self.sample_latent_grid(5, 5)
-            grid_imgs = self.target_g(self._latent_grid_samples)
-            grid_filename = os.path.join(
-                os.path.dirname(filename), f'grid_{os.path.basename(filename)}'
-            )
-            with smart_open.open(grid_filename, 'wb') as output_file:
-                torchvision.utils.save_image(
-                    grid_imgs, output_file, nrow=5,
-                    normalize=True, range=(-1, 1), format='png'
-                )
-
-    def sample_latent_grid(self, nrows, ncols):
-        top_left, top_right, bottom_left, bottom_right = map(
-            lambda x: x.cpu(), self.sample_z(4)
-        )
-        left_col = [
-            slerp(x, top_left, bottom_left) for x in np.linspace(0, 1, nrows)
-        ]
-        right_col = [
-            slerp(x, top_right, bottom_right) for x in np.linspace(0, 1, nrows)
-        ]
-        rows = []
-        for left, right in zip(left_col, right_col):
-            row = [
-                slerp(x, left, right) for x in np.linspace(0, 1, ncols)
-            ]
-            rows.append(torch.from_numpy(np.vstack(row)))
-        grid = torch.cat(rows, dim=0).to(self.device)
-        return grid
-
     def tqdm_class(self):
         if self.args.log_progress_newlines:
             return TqdmNewLines
@@ -281,10 +232,6 @@ class Trainer:
     @property
     def output_root(self):
         return f'{self.args.output}/{self.run_id}'
-
-    @property
-    def sample_root(self):
-        return f'{self.output_root}/samples'
 
     @classmethod
     def create_from_cli(cls):
@@ -355,17 +302,6 @@ class Trainer:
         p.add_argument('--resume-training-id', type=str, default=None,
                        help='Resume training from the last checkpoint in the '
                        'output path with this run id')
-
-
-def slerp(val, low, high):
-    """
-    https://github.com/soumith/dcgan.torch/issues/14#issuecomment-200025792
-    """
-    omega = np.arccos(np.clip(np.dot(low/np.linalg.norm(low), high/np.linalg.norm(high)), -1, 1))
-    so = np.sin(omega)
-    if so == 0:
-        return (1.0-val) * low + val * high # L'Hopital's rule/LERP
-    return np.sin((1.0-val)*omega) / so * low + np.sin(val*omega) / so * high
 
 
 if __name__ == '__main__':

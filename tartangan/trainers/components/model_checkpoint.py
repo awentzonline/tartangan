@@ -20,7 +20,7 @@ class ModelCheckpointComponent(TrainerComponent):
         if steps and steps % self.trainer.args.checkpoint_freq == 0:
             self.save_checkpoint(steps)
 
-    def on_training_end(self, steps):
+    def on_train_end(self, steps):
         self.save_checkpoint(steps)
 
     def save_checkpoint(self, steps):
