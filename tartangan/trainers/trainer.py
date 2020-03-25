@@ -24,6 +24,8 @@ from tartangan.image_bytes_dataset import ImageBytesDataset
 from tartangan.image_folder_dataset import ImageFolderDataset
 from tartangan.metrics_collector import (
     KatibMetricsCollector, KubeflowMetricsCollector)
+from .components.container import ComponentContainer
+from .components.model_checkpoint import ModelCheckpointComponent
 from .tqdm_newlines import TqdmNewLines
 from .utils import set_device_from_args
 from  .. import inception_utils
@@ -46,6 +48,8 @@ class Trainer:
             )
         else:
             self.metrics_collector = None
+        self.components = ComponentContainer()
+        self.components.trainer = self
 
     def _generate_run_id(self, suffix_len=6):
         now = str(datetime.now()).replace(' ', '_')
@@ -54,6 +58,11 @@ class Trainer:
 
     def build_models(self):
         pass
+
+    def setup_components(self):
+        self.components.add_components(
+            ModelCheckpointComponent(),
+        )
 
     def prepare_dataset(self):
         img_size = self.g.max_size
@@ -97,31 +106,38 @@ class Trainer:
         train_loader = data_utils.DataLoader(
             self.dataset, batch_size=self.args.batch_size, shuffle=True, drop_last=True
         )
+        self.setup_components()
         steps = 0
         try:
+            self.components.invoke('train_begin', steps)
             for epoch_i in range(self.args.epochs):
+                self.components.invoke('epoch_begin', steps, epoch_i)
                 loader_iter = self.tqdm_class()(train_loader, **self.tqdm_kwargs())
                 for batch_i, images in enumerate(loader_iter):
-                    metrics = self.train_batch(images)
-                    self.log_metrics(metrics, steps)
-                    round_metrics = {k: round(v, 4) for k, v in metrics.items()}
-                    loader_iter.set_postfix(refresh=False, **round_metrics)
+                    self.components.invoke('batch_begin', steps)
+                    training_metrics = self.train_batch(images)
+                    self.components.invoke('batch_end', steps)
+                    self.log_metrics(training_metrics, steps)
+                    pretty_training_metrics = {
+                        k: round(v, 4) for k, v in training_metrics.items()
+                    }
+                    loader_iter.set_postfix(refresh=False, **pretty_training_metrics)
                     steps += 1
-                    self.periodic_tasks(steps)
+                    #self.periodic_tasks(steps)
+                self.components.invoke('epoch_end', steps, epoch_i)
                 if epoch_i == 0 and self.args.cache_dataset:
                     if hasattr(self.dataset, 'save_cache'):
                         self.dataset.save_cache(self.dataset_cache_path(img_size))
         except KeyboardInterrupt:
             pass
-        self.periodic_tasks(steps, final=True)
+        self.components.invoke('train_end', steps)
+        #self.periodic_tasks(steps, final=True)
         if self.metrics_collector:
             self.metrics_collector.flush()
 
     def periodic_tasks(self, steps, final=False):
         if steps % self.args.gen_freq == 0 or final:
             self.output_samples(f'{self.sample_root}/sample_{steps}.png')
-        if steps % self.args.checkpoint_freq == 0 or final:
-            self.save_checkpoint(f'{self.checkpoint_root}/checkpoint_{steps}')
         if steps % self.args.test_freq == 0 or final:
             self.calculate_metrics()
 
@@ -232,27 +248,6 @@ class Trainer:
         grid = torch.cat(rows, dim=0).to(self.device)
         return grid
 
-    def save_checkpoint(self, filename):
-        model_filenames = (
-            (self.g, f'{filename}_g.pt'),
-            (self.target_g, f'{filename}_g_target.pt'),
-            (self.d, f'{filename}_d.pt')
-        )
-        for model, filename in model_filenames:
-            with smart_open.open(filename, 'wb') as outfile:
-                torch.save(model, outfile)
-
-    def load_checkpoint(self, filename):
-        model_filenames = (
-            ('g', f'{filename}_g.pt'),
-            ('target_g', f'{filename}_g_target.pt'),
-            ('d', f'{filename}_d.pt')
-        )
-        for model_name, model_filename in model_filenames:
-            with smart_open.open(model_filename, 'rb') as infile:
-                model = torch.load(infile)
-                setattr(self, model_name, model)
-
     def tqdm_class(self):
         if self.args.log_progress_newlines:
             return TqdmNewLines
@@ -362,6 +357,9 @@ class Trainer:
                        help='Where to output a file containing run metrics')
         p.add_argument('--metrics-collector', default='kubeflow',
                        help='Which metric collector to use (katib, kubeflow)')
+        p.add_argument('--resume-training-id', type=str, default=None,
+                       help='Resume training from the last checkpoint in the '
+                       'output path with this run id')
 
 
 def slerp(val, low, high):
