@@ -1,7 +1,10 @@
 import argparse
+from datetime import datetime
 import functools
 import hashlib
 import os
+import random
+import string
 
 import numpy as np
 from PIL import Image
@@ -30,6 +33,7 @@ class Trainer:
     def __init__(self, args):
         self.args = args
         self.summary_writer = None
+        self.run_id = self._generate_run_id()
         if self.args.tensorboard:
             self.summary_writer = SummaryWriter()
         if self.args.metrics_path:
@@ -42,6 +46,11 @@ class Trainer:
             )
         else:
             self.metrics_collector = None
+
+    def _generate_run_id(self, suffix_len=6):
+        now = str(datetime.now()).replace(' ', '_')
+        random_suffix = ''.join(random.sample(string.ascii_letters, suffix_len))
+        return f'{now}_{random_suffix}'
 
     def build_models(self):
         pass
@@ -79,8 +88,8 @@ class Trainer:
         return dataset
 
     def train(self):
-        os.makedirs(os.path.dirname(self.args.sample_file), exist_ok=True)
-        os.makedirs(os.path.dirname(self.args.checkpoint), exist_ok=True)
+        os.makedirs(os.path.dirname(self.sample_root + '/'), exist_ok=True)
+        os.makedirs(os.path.dirname(self.checkpoint_root + '/'), exist_ok=True)
         self.build_models()
         self.progress_samples = self.sample_z(32)
         print(f'Preparing dataset from {self.args.data_path}')
@@ -110,9 +119,9 @@ class Trainer:
 
     def periodic_tasks(self, steps, final=False):
         if steps % self.args.gen_freq == 0 or final:
-            self.output_samples(f'{self.args.sample_file}_{steps}.png')
+            self.output_samples(f'{self.sample_root}/sample_{steps}.png')
         if steps % self.args.checkpoint_freq == 0 or final:
-            self.save_checkpoint(f'{self.args.checkpoint}_{steps}')
+            self.save_checkpoint(f'{self.checkpoint_root}/checkpoint_{steps}')
         if steps % self.args.test_freq == 0 or final:
             self.calculate_metrics()
 
@@ -271,10 +280,21 @@ class Trainer:
                 self.metrics_collector.add_scalar('inception_score_mean', is_mean)
                 self.metrics_collector.add_scalar('inception_score_std', is_std)
 
-
     @property
     def device(self):
         return self.args.device
+
+    @property
+    def output_root(self):
+        return f'{self.args.output}/{self.run_id}'
+
+    @property
+    def sample_root(self):
+        return f'{self.output_root}/samples'
+
+    @property
+    def checkpoint_root(self):
+        return f'{self.output_root}/checkpoints'
 
     @classmethod
     def create_from_cli(cls):
@@ -303,12 +323,11 @@ class Trainer:
                        help='Exponential moving average factor for the target generator')
         p.add_argument('--no-cuda', action='store_true')
         p.add_argument('--epochs', type=int, default=10000)
-        p.add_argument('--sample-file', default='sample/tartangan',
-                       help='Prefix for outputted sample files')
+        p.add_argument('--output', default='output',
+                       help='Root of output locations. '
+                            'A path segment unique to the run will be appended.')
         p.add_argument('--checkpoint-freq', type=int, default=100000,
                        help='Output a checkpoint every N batches')
-        p.add_argument('--checkpoint', default='checkpoints/tartangan',
-                       help='Prefix of checkpoint output')
         p.add_argument('--dataset-cache', default='cache/{root}_{size}.pkl',
                        help='Location of dataset cache when using ImageFolderDataset')
         p.add_argument('--grad-penalty', type=float, default=5.,

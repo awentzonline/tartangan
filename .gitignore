@@ -6,6 +6,7 @@ sample/
 cache/
 download/
 checkpoint/
+output/
 *.egg-info
 *.onnx
 *.pt
