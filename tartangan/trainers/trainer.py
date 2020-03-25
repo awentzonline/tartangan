@@ -98,7 +98,6 @@ class Trainer:
 
     def train(self):
         os.makedirs(os.path.dirname(self.sample_root + '/'), exist_ok=True)
-        os.makedirs(os.path.dirname(self.checkpoint_root + '/'), exist_ok=True)
         self.build_models()
         self.progress_samples = self.sample_z(32)
         print(f'Preparing dataset from {self.args.data_path}')
@@ -286,10 +285,6 @@ class Trainer:
     @property
     def sample_root(self):
         return f'{self.output_root}/samples'
-
-    @property
-    def checkpoint_root(self):
-        return f'{self.output_root}/checkpoints'
 
     @classmethod
     def create_from_cli(cls):
