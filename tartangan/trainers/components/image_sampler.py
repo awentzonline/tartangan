@@ -9,14 +9,14 @@ from .base import TrainerComponent
 
 
 class ImageSamplerComponent(TrainerComponent):
-    def on_train_begin(self, steps=0):
+    def on_train_begin(self, steps, logs):
         os.makedirs(os.path.dirname(self.sample_root + '/'), exist_ok=True)
         self.progress_samples = self.trainer.sample_z(32)
 
-    def on_train_end(self, steps):
+    def on_train_end(self, steps, logs):
         self.output_samples(f'{self.sample_root}/sample_{steps}.png')
 
-    def on_batch_end(self, steps):
+    def on_batch_end(self, steps, logs):
         if steps % self.trainer.args.gen_freq == 0:
             self.output_samples(f'{self.sample_root}/sample_{steps}.png')
 

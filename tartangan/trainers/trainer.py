@@ -1,4 +1,5 @@
 import argparse
+from collections import defaultdict
 from datetime import datetime
 import hashlib
 import os
@@ -9,17 +10,14 @@ import numpy as np
 from PIL import Image
 import torch
 import torch.utils.data as data_utils
-try:
-    from torch.utils.tensorboard import SummaryWriter
-except ImportError:
-    print('Tensorboard not available.')
 from torchvision import transforms
 import tqdm
 
 from tartangan.image_bytes_dataset import ImageBytesDataset
 from tartangan.image_folder_dataset import ImageFolderDataset
-from tartangan.metrics_collector import (
-    KatibMetricsCollector, KubeflowMetricsCollector)
+from tartangan.trainers.components.metrics import (
+    KatibMetricsComponent, KubeflowMetricsComponent, TensorboardComponent
+)
 from tartangan.utils.cli import save_cli_arguments
 from .components.container import ComponentContainer
 from .components.model_checkpoint import ModelCheckpointComponent
@@ -40,28 +38,8 @@ class Trainer:
         os.makedirs(self.output_root, exist_ok=True)
         self._save_cli_arguments()
 
-        self.summary_writer = None
-        if self.args.tensorboard:
-            self.summary_writer = SummaryWriter()
-
-        if self.args.metrics_path:
-            metrics_collector_class = {
-                'katib': KatibMetricsCollector,
-                'kubeflow': KubeflowMetricsCollector,
-            }[self.args.metrics_collector]
-            self.metrics_collector = metrics_collector_class(
-                self.args.metrics_path
-            )
-        else:
-            self.metrics_collector = None
-
         self.components = ComponentContainer()
         self.components.trainer = self
-
-    def _generate_run_id(self, suffix_len=6):
-        now = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
-        random_suffix = ''.join(random.sample(string.ascii_letters, suffix_len))
-        return f'{now}_{random_suffix}'
 
     def build_models(self):
         pass
@@ -70,6 +48,17 @@ class Trainer:
         self.components.add_components(
             ImageSamplerComponent(), ModelCheckpointComponent(),
         )
+
+        if self.args.metrics_collector:
+            metrics_collector_class = {
+                'katib': KatibMetricsComponent,
+                'kubeflow': KubeflowMetricsComponent,
+                'tensorboard': TensorboardComponent,
+            }[self.args.metrics_collector]
+            metrics_collector = metrics_collector_class(
+                self.args.metrics_path
+            )
+            self.components.add_components(metrics_collector)
 
     def prepare_dataset(self):
         img_size = self.g.max_size
@@ -112,48 +101,41 @@ class Trainer:
         )
         self.setup_components()
         steps = 0
+        logs = defaultdict(list)
         try:
-            self.components.invoke('train_begin', steps)
+            self.components.invoke('train_begin', steps, logs)
             for epoch_i in range(self.args.epochs):
-                self.components.invoke('epoch_begin', steps, epoch_i)
+                self.components.invoke('epoch_begin', steps, epoch_i, logs)
                 loader_iter = self.tqdm_class()(train_loader, **self.tqdm_kwargs())
                 for batch_i, images in enumerate(loader_iter):
-                    self.components.invoke('batch_begin', steps)
+                    self.components.invoke('batch_begin', steps, logs)
                     training_metrics = self.train_batch(images)
-                    self.components.invoke('batch_end', steps)
-                    self.log_metrics(training_metrics, steps)
+                    for name, value in training_metrics.items():
+                        logs[name].append(value)
+                    self.components.invoke('batch_end', steps, logs)
+                    # update progress bar
                     pretty_training_metrics = {
                         k: round(v, 4) for k, v in training_metrics.items()
                     }
                     loader_iter.set_postfix(refresh=False, **pretty_training_metrics)
                     steps += 1
-                    #self.periodic_tasks(steps)
-                self.components.invoke('epoch_end', steps, epoch_i)
+
+                self.components.invoke('epoch_end', steps, epoch_i, logs)
+                # TODO: extract dataset cacher to component
                 if epoch_i == 0 and self.args.cache_dataset:
                     if hasattr(self.dataset, 'save_cache'):
-                        self.dataset.save_cache(self.dataset_cache_path(img_size))
+                        self.dataset.save_cache(self.dataset_cache_path(self.g.max_size))
         except KeyboardInterrupt:
-            pass
-        self.components.invoke('train_end', steps)
-        #self.periodic_tasks(steps, final=True)
-        if self.metrics_collector:
-            self.metrics_collector.flush()
-
-    def periodic_tasks(self, steps, final=False):
-        if steps % self.args.test_freq == 0 or final:
-            self.calculate_metrics()
+            pass  # Graceful interrupt
+        self.components.invoke('train_end', steps, logs)
 
     def dataset_cache_path(self, size):
+        # TODO: extract to component
         root_hash = hashlib.md5(self.dataset.root.encode('utf-8')).hexdigest()
         return self.args.dataset_cache.format(
             root=root_hash,
             size=size
         )
-
-    def log_metrics(self, metrics, i=None):
-        if not self.summary_writer:
-            return
-        self.summary_writer.add_scalars('training', metrics, i)
 
     def train_batch(self, imgs):
         # train discriminator
@@ -224,12 +206,14 @@ class Trainer:
 
     def calculate_metrics(self):
         """Calculate inception metrics"""
+        # TODO: invoke this in training loop and pass metrics into component `logs`
         if self.get_inception_metrics:
             is_mean, is_std, fid = self.get_inception_metrics(
                 self.sample_g, self.args.n_inception_imgs, num_splits=5
             )
             print('Inception Score is %3.3f +/- %3.3f' % (is_mean, is_std))
             print('FID is %5.4f' % (fid,))
+            # move this to training loop:
             if self.metrics_collector:
                 self.metrics_collector.add_scalar('fid', fid)
                 self.metrics_collector.add_scalar('inception_score_mean', is_mean)
@@ -237,6 +221,11 @@ class Trainer:
 
     def _save_cli_arguments(self):
         save_cli_arguments(f'{self.output_root}/config.args')
+
+    def _generate_run_id(self, suffix_len=6):
+        now = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+        random_suffix = ''.join(random.sample(string.ascii_letters, suffix_len))
+        return f'{now}_{random_suffix}'
 
     @property
     def device(self):
@@ -290,14 +279,11 @@ class Trainer:
                        help='Multiple the output dimensionality of all layers by this factor')
         p.add_argument('--cache-dataset', action='store_true',
                        help='Enable dataset caching with ImageFolderDataset')
-        p.add_argument('--log-dir', default='runs',
-                       help='Path to tensorboard log directory')
-        p.add_argument('--tensorboard', action='store_true',
-                       help='Enable tensorboard logging')
         p.add_argument('--g-base', default='mlp',
                        help='Method generator uses to prepare the inputted latent code')
         p.add_argument('--norm', default='bn',
-                       help='Layer normalization method. Either "bn" (batchnorm) or "id" (identity)')
+                       help='Layer normalization method. Either "bn" '
+                            '(batchnorm) or "id" (identity)')
         p.add_argument('--activation', default='relu',
                        help='Activation function, either "relu" or "selu"')
         p.add_argument('--quiet-logs', action='store_true', help='Reduce log output')
@@ -312,8 +298,8 @@ class Trainer:
         p.add_argument('--n-inception-imgs', default=1000, type=int)
         p.add_argument('--metrics-path', default=None,
                        help='Where to output a file containing run metrics')
-        p.add_argument('--metrics-collector', default='kubeflow',
-                       help='Which metric collector to use (katib, kubeflow)')
+        p.add_argument('--metrics-collector', default=None,
+                       help='Which metric collector to use (katib, kubeflow, tensorflow)')
         p.add_argument('--resume-training-id', type=str, default=None,
                        help='Resume training from the last checkpoint in the '
                        'output path with this run id')

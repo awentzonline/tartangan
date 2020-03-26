@@ -9,18 +9,18 @@ from .base import TrainerComponent
 class ModelCheckpointComponent(TrainerComponent):
     """Saves the models at regular intervals."""
 
-    def on_train_begin(self, steps=0):
+    def on_train_begin(self, steps, logs):
         os.makedirs(
             os.path.dirname(self.checkpoint_root + '/'), exist_ok=True)
 
         if self.trainer.args.resume_training_id:
             self.load_checkpoint('TODO')
 
-    def on_batch_end(self, steps):
+    def on_batch_end(self, steps, logs):
         if steps and steps % self.trainer.args.checkpoint_freq == 0:
             self.save_checkpoint(steps)
 
-    def on_train_end(self, steps):
+    def on_train_end(self, steps, logs):
         self.save_checkpoint(steps)
 
     def save_checkpoint(self, steps):

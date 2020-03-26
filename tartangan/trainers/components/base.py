@@ -4,22 +4,22 @@ import abc
 class TrainerComponent(abc.ABC):
     """Interface for composable functionality in the Trainer."""
 
-    def on_train_begin(self, step=0):
+    def on_train_begin(self, steps, logs):
         pass
 
-    def on_train_end(self, step):
+    def on_train_end(self, steps, logs):
         pass
 
-    def on_batch_begin(self, step):
+    def on_batch_begin(self, steps, logs):
         pass
 
-    def on_batch_end(self, step):
+    def on_batch_end(self, steps, logs):
         pass
 
-    def on_epoch_begin(self, step, epoch):
+    def on_epoch_begin(self, steps, epochs, logs):
         pass
 
-    def on_epoch_end(self, step, epoch):
+    def on_epoch_end(self, steps, epochs, logs):
         pass
 
     @property
