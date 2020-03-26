@@ -32,7 +32,11 @@ from .. import inception_utils
 class Trainer:
     def __init__(self, args):
         self.args = args
-        self.run_id = self._generate_run_id()
+
+        if args.run_id is None:
+            self.run_id = self._generate_run_id()
+        else:
+            self.run_id = args.run_id
         os.makedirs(self.output_root, exist_ok=True)
         self._save_cli_arguments()
 
@@ -55,7 +59,7 @@ class Trainer:
         self.components.trainer = self
 
     def _generate_run_id(self, suffix_len=6):
-        now = str(datetime.now()).replace(' ', '_')
+        now = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
         random_suffix = ''.join(random.sample(string.ascii_letters, suffix_len))
         return f'{now}_{random_suffix}'
 
@@ -313,6 +317,9 @@ class Trainer:
         p.add_argument('--resume-training-id', type=str, default=None,
                        help='Resume training from the last checkpoint in the '
                        'output path with this run id')
+        p.add_argument('--run-id', default=None,
+                       help='Explicitly set a run id. Otherwise, one will '
+                       'be generated automatically.')
 
 
 if __name__ == '__main__':
