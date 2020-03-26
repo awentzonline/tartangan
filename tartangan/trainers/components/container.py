@@ -3,8 +3,8 @@ from .base import TrainerComponent
 
 class ComponentContainer(TrainerComponent):
     """A component that contains other components."""
-    def __init__(self, *components):
-        self.components = components
+    def __init__(self):
+        self.components = []
 
     def add_components(self, *components):
         for component in components:
