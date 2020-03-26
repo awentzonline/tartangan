@@ -85,7 +85,7 @@ class ResidualDiscriminatorBlock(nn.Module):
         return x + h
 
 
-class DiscriminatorOutput(nn.Module):
+class DiscriminatorPoolOnlyOutput(nn.Module):
     def __init__(self, in_dims, out_dims, pool='sum',
                  norm_factory=nn.BatchNorm2d,
                  activation_factory=functools.partial(nn.LeakyReLU, 0.2)):
@@ -112,12 +112,35 @@ class DiscriminatorOutput(nn.Module):
             raise ValueError(f'DiscriminatorOutput has no pooling method named "{self.pool}"')
 
 
-class IQNDiscriminatorOutput(nn.Module):
-    def __init__(self, in_dims, out_dims,norm_factory=nn.BatchNorm2d,
+class DiscriminatorOutput(nn.Module):
+    def __init__(self, in_dims, out_dims,
+                 norm_factory=nn.BatchNorm2d,
                  activation_factory=functools.partial(nn.LeakyReLU, 0.2)):
         super().__init__()
-        self.to_output = nn.Sequential(
+        self.activation = nn.Sequential(
+            norm_factory(in_dims),
             activation_factory(),
+        )
+        self.to_output = nn.Sequential(
+            nn.Linear(in_dims, out_dims),
+        )
+
+    def forward(self, feats):
+        feats = self.activation(feats)
+        feats = torch.sum(feats, [2, 3])  # sum pool
+        y = self.to_output(feats)
+        return y
+
+
+class IQNDiscriminatorOutput(nn.Module):
+    def __init__(self, in_dims, out_dims, norm_factory=nn.BatchNorm2d,
+                 activation_factory=functools.partial(nn.LeakyReLU, 0.2)):
+        super().__init__()
+        self.activation = nn.Sequential(
+            norm_factory(in_dims),
+            activation_factory(),
+        )
+        self.to_output = nn.Sequential(
             nn.Linear(in_dims, out_dims),
         )
         feats_dims = in_dims
@@ -125,6 +148,7 @@ class IQNDiscriminatorOutput(nn.Module):
         self.out_dims = out_dims
 
     def forward(self, feats, targets=None):
+        feats = self.activation(feats)
         feats = torch.sum(feats, [2, 3])  # sum pool spatially
         feats_shape = list(feats.shape)
         feats_tau, taus = self.iqn(feats)
