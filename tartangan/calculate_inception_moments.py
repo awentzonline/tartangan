@@ -15,13 +15,13 @@ import torch
 import torch.nn.functional as F
 import torch.utils.data as data_utils
 from torchvision import transforms
-from tqdm import tqdm
 
 from .image_bytes_dataset import ImageBytesDataset
+from .trainers.tqdm_newlines import tqdm_class, tqdm_kwargs
 from . import inception_utils
 
 
-def calculate_inception_moments(loader):
+def calculate_inception_moments(loader, use_newlines=False, log_iters=10, quiet_logs=False):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     print(f'Using device "{device}"')
     print('Loading inception net...')
@@ -29,7 +29,9 @@ def calculate_inception_moments(loader):
     net = net.to(device)
     pool, logits = [], []
     print('Evaluating dataset activations...')
-    for i, x in enumerate(tqdm(loader)):
+    tqdm = tqdm_class(use_newlines)
+    progress_iter = tqdm(loader, **tqdm_kwargs(quiet_logs, log_iters))
+    for i, x in enumerate(progress_iter):
         x = x.to(device)
         with torch.no_grad():
             pool_val, logits_val = net(x)
@@ -56,6 +58,11 @@ if __name__ == '__main__':
     p.add_argument('source', help='Root path of dataset')
     p.add_argument('destination', help='Output location')
     p.add_argument('--batch-size', type=int, default=32)
+    p.add_argument('--log-iters', type=int, default=10)
+    p.add_argument('--quiet-logs', action='store_true',
+                   help='Less verbose logs')
+    p.add_argument('--log-newlines', action='store_true',
+                   help='Use newlines instead of carriage returns in progress bar.')
     args = p.parse_args()
 
     transform = transforms.Compose([
@@ -70,7 +77,10 @@ if __name__ == '__main__':
     loader = data_utils.DataLoader(
         dataset, batch_size=args.batch_size, shuffle=True, drop_last=True
     )
-    mu, sigma = calculate_inception_moments(loader)
+    mu, sigma = calculate_inception_moments(
+        loader, use_newlines=args.log_newlines, quiet_logs=args.quiet_logs,
+        log_iters=args.log_iters
+    )
     print(f'Saving calculated means and covariances to "{args.destination}"...')
     with smart_open.open(args.destination, 'wb') as outfile:
         np.savez(outfile, mu=mu, sigma=sigma)
