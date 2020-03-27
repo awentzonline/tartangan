@@ -1,13 +1,10 @@
 import os
-import pickle
 
 import numpy as np
 from PIL import Image
 import smart_open
-import torch
 from torch.utils.data import Dataset
 from torchvision.datasets.folder import IMG_EXTENSIONS, default_loader
-from torchvision.datasets.utils import list_files
 from torchvision import transforms
 import tqdm
 
@@ -77,7 +74,10 @@ if __name__ == '__main__':
             (args.resize, args.resize), interpolation=Image.LANCZOS
         ),
     ])
+    print(f'preparing data from "{args.source}"')
     data = ImageBytesDataset.prepare_data_from_path(
         args.source, transform=transform, trunc=args.trunc
     )
-    np.save(args.destination, data)
+    print(f'saving dataset to "{args.destination}"')
+    with smart_open.open(args.destination, 'wb') as outfile:
+        np.save(outfile, data)

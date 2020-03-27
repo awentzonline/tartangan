@@ -23,9 +23,12 @@ from . import inception_utils
 
 def calculate_inception_moments(loader):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    print(f'Using device "{device}"')
+    print('Loading inception net...')
     net = inception_utils.load_inception_net(parallel=False)
     net = net.to(device)
     pool, logits = [], []
+    print('Evaluating dataset activations...')
     for i, x in enumerate(tqdm(loader)):
         x = x.to(device)
         with torch.no_grad():
@@ -60,6 +63,7 @@ if __name__ == '__main__':
         transforms.Normalize(mean=[0.485, 0.456, 0.406],
                              std=[0.229, 0.224, 0.225]),
     ])
+    print(f'Loading dataset from {args.source}')
     dataset = ImageBytesDataset.from_path(
         args.source, transform=transform
     )
@@ -67,6 +71,6 @@ if __name__ == '__main__':
         dataset, batch_size=args.batch_size, shuffle=True, drop_last=True
     )
     mu, sigma = calculate_inception_moments(loader)
-    print('Saving calculated means and covariances to disk...')
+    print(f'Saving calculated means and covariances to "{args.destination}"...')
     with smart_open.open(args.destination, 'wb') as outfile:
         np.savez(outfile, mu=mu, sigma=sigma)
