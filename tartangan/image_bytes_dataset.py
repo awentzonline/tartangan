@@ -67,13 +67,20 @@ if __name__ == '__main__':
     p.add_argument('destination', help='Output location of dataset')
     p.add_argument('--resize', help='Width/height of saved images', default=64, type=int)
     p.add_argument('--trunc', default=None, type=int, help='Take only first N samples')
+    p.add_argument('--square', action='store_true', help="Don't preserve aspect ratio")
     args = p.parse_args()
 
-    transform = transforms.Compose([
-        transforms.Resize(
-            (args.resize, args.resize), interpolation=Image.LANCZOS
-        ),
-    ])
+    if args.square:
+        resize_shape = (args.resize, args.resize)
+        transform = transforms.Compose([
+            transforms.Resize(resize_shape, interpolation=Image.LANCZOS),
+        ])
+    else:
+        resize_shape = args.resize
+        transform = transforms.Compose([
+            transforms.Resize(resize_shape, interpolation=Image.LANCZOS),
+            transforms.RandomCrop(resize_shape),
+        ])
     print(f'preparing data from "{args.source}"')
     data = ImageBytesDataset.prepare_data_from_path(
         args.source, transform=transform, trunc=args.trunc
