@@ -10,6 +10,7 @@ from .blocks import (
     DiscriminatorBlock, DiscriminatorOutput, DiscriminatorInput,
     GeneratorBlock, GeneratorInputMLP, GeneratorOutput,
     ResidualDiscriminatorBlock, ResidualGeneratorBlock,
+    SceneBlock, SceneInput, SceneOutput, SceneUpscale,
     SelfAttention2d, TiledZGeneratorInput
 )
 
@@ -129,6 +130,40 @@ class IQNDiscriminator(Discriminator):
         y = self.blocks(x)
         out = self.to_output(y, targets=targets)
         return out
+
+
+class SceneGenerator(BlockModel):
+    default_input = SceneInput
+    default_block = SceneBlock
+    default_output = SceneOutput
+
+    def build(self):
+        blocks = [
+            self.input_factory(
+                self.config.latent_dims, self.config.data_dims, self.config.base_size
+            )
+        ]
+        num_blocks_per_scale = 5 * self.config.num_blocks_per_scale
+        conv_dims = 32
+        for block_i in range(len(self.config.blocks) + 1):
+            scale_blocks = []
+            for i in range(num_blocks_per_scale - 1):
+                scale_blocks.append(
+                    self.block_factory(self.config.latent_dims, self.config.data_dims)
+                )
+
+            if block_i < len(self.config.blocks):
+                scale_blocks += [
+                    SceneUpscale()
+                ]
+            blocks += scale_blocks
+        self.blocks = nn.Sequential(*blocks)
+
+    def forward(self, x, return_z_final=False):
+        z, canvas = reduce(lambda f, b: b(f), self.blocks, x)
+        if return_z_final:
+            return z, canvas
+        return canvas
 
 
 GAN_CONFIGS = {

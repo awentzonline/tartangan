@@ -1,4 +1,5 @@
 from .attention import SelfAttention2d  # noqa
+from .scene import SceneInput, SceneBlock, SceneOutput, SceneUpscale  # noqa
 from .discriminator import (  # noqa
     DiscriminatorBlock, DiscriminatorInput, DiscriminatorOutput,
     DiscriminatorPoolOnlyOutput,
