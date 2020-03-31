@@ -11,10 +11,11 @@ from torchvision import transforms
 import tqdm
 
 from tartangan.models.blocks import (
-    SceneBlock, SceneInput, SceneOutput,
+    SceneBlock, SceneInput, GeneratorOutput, SceneStructureBlock,
+    ResidualGeneratorBlock,
     DiscriminatorBlock, ResidualDiscriminatorBlock, DiscriminatorOutput
 )
-from tartangan.models.pluggan import SceneGenerator, Discriminator, GAN_CONFIGS
+from tartangan.models.pluggan import StructuredSceneGenerator, Discriminator, GAN_CONFIGS
 from tartangan.models.losses import (
     discriminator_hinge_loss, generator_hinge_loss, gradient_penalty
 )
@@ -29,13 +30,14 @@ class SceneTrainer(Trainer):
         self.gan_config = self.gan_config.scale_model(self.args.model_scale)
         g_norm_factory = {
             'id': nn.Identity,
-            'bn': nn.BatchNorm1d,
+            'bn': nn.BatchNorm2d,
         }[self.args.norm]
+        d_norm_factory = nn.Identity
         d_norm_factory = {
             'id': nn.Identity,
             'bn': nn.BatchNorm2d,
         }[self.args.norm]
-        g_input_factory = SceneInput
+        g_input_factory = SceneStructureBlock
         activation_factory = {
             'relu': functools.partial(nn.LeakyReLU, 0.2),
             'selu': nn.SELU,
@@ -46,7 +48,7 @@ class SceneTrainer(Trainer):
             g_input_factory, activation_factory=activation_factory
         )
         g_block_factory = functools.partial(
-            SceneBlock, norm_factory=g_norm_factory,
+            ResidualGeneratorBlock, norm_factory=g_norm_factory,
             activation_factory=activation_factory
         )
         d_block_factory = functools.partial(
@@ -54,20 +56,20 @@ class SceneTrainer(Trainer):
             activation_factory=activation_factory
         )
         g_output_factory = functools.partial(
-            SceneOutput, norm_factory=g_norm_factory,
+            GeneratorOutput, norm_factory=g_norm_factory,
             activation_factory=activation_factory
         )
         d_output_factory = functools.partial(
             DiscriminatorOutput, norm_factory=d_norm_factory,
             activation_factory=activation_factory
         )
-        self.g = SceneGenerator(
+        self.g = StructuredSceneGenerator(
             self.gan_config,
             input_factory=g_input_factory,
             block_factory=g_block_factory,
             output_factory=g_output_factory,
         ).to(self.device)
-        self.target_g = SceneGenerator(
+        self.target_g = StructuredSceneGenerator(
             self.gan_config,
             input_factory=g_input_factory,
             block_factory=g_block_factory,
@@ -136,12 +138,11 @@ class SceneTrainer(Trainer):
         toggle_grad(self.g, True)
         toggle_grad(self.d, False)
         self.optimizer_g.zero_grad()
-        batch_imgs, labels, z = self.make_generator_batch(imgs)
+        batch_imgs, labels = self.make_generator_batch(imgs)
         #torchvision.utils.save_image(batch_imgs, 'batch.png', normalize=True, range=(-1, 1))
         p_labels = self.d(batch_imgs)
         #g_loss = self.g_loss(p_labels)
         g_loss = self.bce_loss(p_labels, labels)
-        g_loss += (z ** 2).sum() * 0.001  # l2 penalty on final z
         g_loss.backward()
         self.optimizer_g.step()
 
@@ -151,12 +152,12 @@ class SceneTrainer(Trainer):
             g_loss=float(g_loss), d_loss=float(d_loss),
             gp=float(d_grad_penalty)
         )
-
-    def make_generator_batch(self, real_data, **g_kwargs):
-        z, generated_data = self.sample_g(len(real_data), return_z_final=True, **g_kwargs)
-        labels = torch.ones(len(generated_data), 1).to(self.device)
-        return generated_data, labels, z
-
+    #
+    # def make_generator_batch(self, real_data, **g_kwargs):
+    #     z, generated_data = self.sample_g(len(real_data), return_z_final=True, **g_kwargs)
+    #     labels = torch.ones(len(generated_data), 1).to(self.device)
+    #     return generated_data, labels, z
+    #
     @torch.no_grad()
     def update_target_generator(self, lr=None):
         if lr is None:
