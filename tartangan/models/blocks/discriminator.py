@@ -33,7 +33,7 @@ class DiscriminatorBlock(nn.Module):
             norm_factory(out_dims),
             activation_factory(),
             nn.Conv2d(out_dims, out_dims, 3, padding=1, bias=True),
-            Interpolate(scale_factor=0.5, mode='bilinear', align_corners=True),
+            nn.AvgPool2d(2),
         ]
         if first_block:
             layers = layers[2:]
@@ -55,7 +55,7 @@ class ResidualDiscriminatorBlock(nn.Module):
             norm_factory(out_dims),
             activation_factory(),
             nn.Conv2d(out_dims, out_dims, 3, padding=1, bias=True),
-            Interpolate(scale_factor=0.5, mode='bilinear', align_corners=True),
+            nn.AvgPool2d(2),
         ]
         if first_block:
             layers = layers[2:]

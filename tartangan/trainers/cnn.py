@@ -29,10 +29,11 @@ class CNNTrainer(Trainer):
     def build_models(self):
         self.gan_config = GAN_CONFIGS[self.args.config]
         self.gan_config = self.gan_config.scale_model(self.args.model_scale)
-        norm_factory = {
+        g_norm_factory = {
             'id': nn.Identity,
             'bn': nn.BatchNorm2d,
         }[self.args.norm]
+        d_norm_factory = nn.Identity
         g_input_factory = {
             'mlp': GeneratorInputMLP,
             'tiledz': TiledZGeneratorInput,
@@ -47,19 +48,19 @@ class CNNTrainer(Trainer):
             g_input_factory, activation_factory=activation_factory
         )
         g_block_factory = functools.partial(
-            ResidualGeneratorBlock, norm_factory=norm_factory,
+            ResidualGeneratorBlock, norm_factory=g_norm_factory,
             activation_factory=activation_factory
         )
         d_block_factory = functools.partial(
-            ResidualDiscriminatorBlock, norm_factory=norm_factory,
+            ResidualDiscriminatorBlock, norm_factory=d_norm_factory,
             activation_factory=activation_factory
         )
         g_output_factory = functools.partial(
-            GeneratorOutput, norm_factory=norm_factory,
+            GeneratorOutput, norm_factory=g_norm_factory,
             activation_factory=activation_factory
         )
         d_output_factory = functools.partial(
-            DiscriminatorOutput, norm_factory=norm_factory,
+            DiscriminatorOutput, norm_factory=d_norm_factory,
             activation_factory=activation_factory
         )
         self.g = Generator(

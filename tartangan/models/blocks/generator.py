@@ -22,7 +22,7 @@ class GeneratorBlock(nn.Module):
         if first_block:
             layers = layers[2:]
         if upsample:
-            layers.insert(0, Interpolate(scale_factor=2, mode='bilinear', align_corners=True))
+            layers.insert(0, Interpolate(scale_factor=2, mode='nearest'))
         self.convs = nn.Sequential(*layers)
 
     def forward(self, x):
@@ -55,7 +55,7 @@ class ResidualGeneratorBlock(nn.Module):
 
     def forward(self, x):
         if self.upsample:
-            x = F.interpolate(x, scale_factor=2, mode='bilinear', align_corners=True)
+            x = F.interpolate(x, scale_factor=2, mode='nearest')
         h = self.convs(x)
         if self.project_input is not None:
             x = self.project_input(x)
