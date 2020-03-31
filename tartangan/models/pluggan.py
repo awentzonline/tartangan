@@ -238,7 +238,7 @@ GAN_CONFIGS = {
         base_size=4,
         data_dims=3,
         latent_dims=256,
-        attention=(2,),
+        attention=(3,),
         num_blocks_per_scale=1,
         blocks=(
             128,  # 8,
@@ -253,7 +253,7 @@ GAN_CONFIGS = {
         data_dims=3,
         #latent_dims=256,
         latent_dims=256,
-        attention=(2,),
+        attention=(3,),
         num_blocks_per_scale=1,
         blocks=(
             1024,  # 8,
