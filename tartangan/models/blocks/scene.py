@@ -125,6 +125,11 @@ class SceneStructureBlock(nn.Module):
         self.scene_size = scene_size
         self.patch_size = patch_size
         self.patch_noise = patch_noise
+        if patch_noise:
+            self.noise_proto = nn.Parameter(
+                torch.zeros(self.patch_size, self.patch_size),
+                requires_grad=False
+            )
         self.refine_patches = refine_patches
         if not refine_patches:
             self.full_masks = nn.Parameter(
@@ -144,7 +149,7 @@ class SceneStructureBlock(nn.Module):
         transforms = transforms.permute(1, 0, 2, 3)
         patches = []
         if self.patch_noise:
-            noise = torch.randn(self.patch_size, self.patch_size)
+            noise = torch.randn_like(self.noise_proto)
         for i in range(self.num_patches):
             mask = masks[i][:, None, ...]
             if self.patch_noise:
