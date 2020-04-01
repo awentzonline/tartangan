@@ -174,14 +174,13 @@ class StructuredSceneGenerator(BlockModel):
     def build(self):
         scene_size = 8
         self.structure_generator = self.input_factory(
-            self.config.latent_dims, num_patches=20,
-            patch_size=3, scene_size=scene_size,
+            self.config.latent_dims
         )
         blocks = [self.structure_generator]
         in_dims = self.structure_generator.output_channels
         num_blocks_per_scale = self.config.num_blocks_per_scale
         first_block = True
-        scene_i = int(np.log2(scene_size / 4))
+        scene_i = int(np.log2(self.structure_generator.scene_size / 4))
         for block_i, out_dims in enumerate(self.config.blocks[scene_i:]):
             scale_blocks = [self.block_factory(in_dims, out_dims, first_block=first_block)]
             first_block = False
