@@ -93,7 +93,8 @@ class SceneStructureBlock(nn.Module):
     Outputs 2d maps of opacity and orientation per component
     """
     def __init__(self, in_dims, num_patches, patch_size=3, scene_size=16,
-                 output_orientations=False, refine_patches=True,
+                 output_orientations=False, refine_patches=False,
+                 patch_noise=True,
                  norm_factory=nn.BatchNorm1d,
                  activation_factory=functools.partial(nn.LeakyReLU, 0.2),
                  **kwargs):
@@ -123,6 +124,7 @@ class SceneStructureBlock(nn.Module):
         self.output_orientations = output_orientations
         self.scene_size = scene_size
         self.patch_size = patch_size
+        self.patch_noise = patch_noise
         self.refine_patches = refine_patches
         if not refine_patches:
             self.full_masks = nn.Parameter(
@@ -141,8 +143,12 @@ class SceneStructureBlock(nn.Module):
         masks = masks.permute(1, 0, 2, 3)  # PBHW
         transforms = transforms.permute(1, 0, 2, 3)
         patches = []
+        if self.patch_noise:
+            noise = torch.randn(self.patch_size, self.patch_size)
         for i in range(self.num_patches):
             mask = masks[i][:, None, ...]
+            if self.patch_noise:
+                mask = mask * noise
             transform = transforms[i]
             grid = F.affine_grid(transform, (z.shape[0], 1, self.scene_size, self.scene_size), align_corners=False)
             transformed_mask = F.grid_sample(mask, grid, align_corners=False)

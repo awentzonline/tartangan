@@ -40,7 +40,8 @@ class SceneTrainer(Trainer):
         g_input_factory = functools.partial(
             SceneStructureBlock, scene_size=self.args.scene_size,
             patch_size=self.args.patch_size, num_patches=self.args.num_patches,
-            refine_patches=self.args.refine_patches,        
+            refine_patches=self.args.refine_patches,
+            patch_noise=self.args.patch_noise,
         )
         activation_factory = {
             'relu': functools.partial(nn.LeakyReLU, 0.2),
@@ -178,6 +179,7 @@ class SceneTrainer(Trainer):
         p.add_argument('--patch-size', type=int, default=3)
         p.add_argument('--num-patches', type=int, default=20)
         p.add_argument('--refine-patches', action='store_true')
+        p.add_argument('--patch-noise', action='store_true')
 
 def main():
     trainer = SceneTrainer.create_from_cli()
