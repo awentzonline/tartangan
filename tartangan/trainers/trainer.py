@@ -16,7 +16,8 @@ import tqdm
 from tartangan.image_bytes_dataset import ImageBytesDataset
 from tartangan.image_folder_dataset import ImageFolderDataset
 from tartangan.trainers.components.metrics import (
-    KatibMetricsComponent, KubeflowMetricsComponent, TensorboardComponent
+    FIDComponent, KatibMetricsComponent, KubeflowMetricsComponent,
+    TensorboardComponent
 )
 from tartangan.utils.cli import save_cli_arguments
 from .components.container import ComponentContainer
@@ -24,7 +25,6 @@ from .components.model_checkpoint import ModelCheckpointComponent
 from .components.image_sampler import ImageSamplerComponent
 from .tqdm_newlines import TqdmNewLines
 from .utils import set_device_from_args
-from .. import inception_utils
 
 
 class Trainer:
@@ -48,6 +48,9 @@ class Trainer:
         self.components.add_components(
             ImageSamplerComponent(), ModelCheckpointComponent(),
         )
+
+        if self.args.inception_moments and self.args.inception_moments != 'None':
+            self.components.add_components(FIDComponent())
 
         if self.args.metrics_collector:
             metrics_collector_class = {
@@ -85,13 +88,6 @@ class Trainer:
             dataset = ImageBytesDataset.from_path(
                 self.args.data_path, transform=transform
             )
-        # setup for output quality metrics
-        if self.args.inception_moments and self.args.inception_moments != 'None':
-            self.get_inception_metrics = inception_utils.prepare_inception_metrics(
-                self.args.inception_moments, self.device, False
-            )
-        else:
-            self.get_inception_metrics = None
         return dataset
 
     def train(self):
@@ -206,21 +202,6 @@ class Trainer:
                 mininterval=0, maxinterval=np.inf, miniters=self.args.log_iters
             )
 
-    def calculate_metrics(self):
-        """Calculate inception metrics"""
-        # TODO: invoke this in training loop and pass metrics into component `logs`
-        if self.get_inception_metrics:
-            is_mean, is_std, fid = self.get_inception_metrics(
-                self.sample_g, self.args.n_inception_imgs, num_splits=5
-            )
-            print('Inception Score is %3.3f +/- %3.3f' % (is_mean, is_std))
-            print('FID is %5.4f' % (fid,))
-            # move this to training loop:
-            if self.metrics_collector:
-                self.metrics_collector.add_scalar('fid', fid)
-                self.metrics_collector.add_scalar('inception_score_mean', is_mean)
-                self.metrics_collector.add_scalar('inception_score_std', is_std)
-
     def _save_cli_arguments(self):
         save_cli_arguments(f'{self.output_root}/config.args')
 
@@ -308,6 +289,8 @@ class Trainer:
         p.add_argument('--run-id', default=None,
                        help='Explicitly set a run id. Otherwise, one will '
                        'be generated automatically.')
+        p.add_argument('--cleanup-inception-model', action='store_true',
+                       help='Delete pretrained inception model used for FID metric.')
 
 
 if __name__ == '__main__':

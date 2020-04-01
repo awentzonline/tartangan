@@ -9,6 +9,10 @@
  Note that if you don't shuffle the data, the IS of true data will be under-
  estimated as it is label-ordered. By default, the data is not shuffled
  so as to reduce non-determinism. '''
+import os
+import shutil
+import tempfile
+
 import numpy as np
 import smart_open
 import torch
@@ -63,6 +67,8 @@ if __name__ == '__main__':
                    help='Less verbose logs')
     p.add_argument('--log-newlines', action='store_true',
                    help='Use newlines instead of carriage returns in progress bar.')
+    p.add_argument('--cleanup-inception-model', action='store_true',
+                   help='Delete the pre-trained model after use.')
     args = p.parse_args()
 
     transform = transforms.Compose([
@@ -77,10 +83,22 @@ if __name__ == '__main__':
     loader = data_utils.DataLoader(
         dataset, batch_size=args.batch_size, shuffle=True, drop_last=True
     )
-    mu, sigma = calculate_inception_moments(
-        loader, use_newlines=args.log_newlines, quiet_logs=args.quiet_logs,
-        log_iters=args.log_iters
-    )
+
+    if args.cleanup_inception_model:
+        model_path = tempfile.mkdtemp()
+        os.environ['TORCH_HOME'] = model_path
+        print(f'Setting $TORCH_HOME to {model_path}')
+
+    try:
+        mu, sigma = calculate_inception_moments(
+            loader, use_newlines=args.log_newlines, quiet_logs=args.quiet_logs,
+            log_iters=args.log_iters
+        )
+    finally:
+        if args.cleanup_inception_model:
+            print('Deleting pretrained model...')
+            shutil.rmtree(model_path)
+
     print(f'Saving calculated means and covariances to "{args.destination}"...')
     with smart_open.open(args.destination, 'wb') as outfile:
         np.savez(outfile, mu=mu, sigma=sigma)
