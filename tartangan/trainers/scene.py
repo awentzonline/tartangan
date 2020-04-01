@@ -32,12 +32,16 @@ class SceneTrainer(Trainer):
             'id': nn.Identity,
             'bn': nn.BatchNorm2d,
         }[self.args.norm]
-        d_norm_factory = nn.Identity
+        d_norm_factory = g_norm_factory  # nn.Identity
         d_norm_factory = {
             'id': nn.Identity,
             'bn': nn.BatchNorm2d,
         }[self.args.norm]
-        g_input_factory = SceneStructureBlock
+        g_input_factory = functools.partial(
+            SceneStructureBlock, scene_size=self.args.scene_size,
+            patch_size=self.args.patch_size, num_patches=self.args.num_patches,
+            refine_patches=self.args.refine_patches,        
+        )
         activation_factory = {
             'relu': functools.partial(nn.LeakyReLU, 0.2),
             'selu': nn.SELU,
@@ -167,6 +171,13 @@ class SceneTrainer(Trainer):
                 (g_p - target_g_p) * self.args.lr_target_g
             )
 
+    @classmethod
+    def add_args_to_parser(cls, p):
+        super().add_args_to_parser(p)
+        p.add_argument('--scene-size', type=int, default=16)
+        p.add_argument('--patch-size', type=int, default=3)
+        p.add_argument('--num-patches', type=int, default=20)
+        p.add_argument('--refine-patches', action='store_true')
 
 def main():
     trainer = SceneTrainer.create_from_cli()

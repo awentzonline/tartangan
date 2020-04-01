@@ -92,8 +92,9 @@ class SceneStructureBlock(nn.Module):
 
     Outputs 2d maps of opacity and orientation per component
     """
-    def __init__(self, in_dims, num_patches, patch_size=7, scene_size=13,
-                 output_orientations=False, norm_factory=nn.BatchNorm1d,
+    def __init__(self, in_dims, num_patches, patch_size=3, scene_size=16,
+                 output_orientations=False, refine_patches=True,
+                 norm_factory=nn.BatchNorm1d,
                  activation_factory=functools.partial(nn.LeakyReLU, 0.2),
                  **kwargs):
         super().__init__()
@@ -102,26 +103,39 @@ class SceneStructureBlock(nn.Module):
             nn.Linear(in_dims, num_patches * self.patch_area),
             nn.Sigmoid(),
         )
+        self.masks[0].weight.data.zero_()
+        self.masks[0].bias.data.zero_()
 
         affine_transform_dims = 2 * 3
         self.patch_transforms = nn.Sequential(
             nn.Linear(in_dims, affine_transform_dims * num_patches),
         )
         self.patch_transforms[0].weight.data.zero_()
-        inital_scale = 0.3
+        initial_scale = 2
         self.patch_transforms[0].bias.data.copy_(
-            torch.tensor([inital_scale, 0, 0, 0, inital_scale, 0], dtype=torch.float).repeat(num_patches)
+            torch.tensor(
+                [initial_scale, 0, 0, 0, initial_scale, 0],
+                dtype=torch.float
+            ).repeat(num_patches)
         )
-        xx = torch.tensor([inital_scale, 0, 0, 0, inital_scale, 0], dtype=torch.float).repeat(num_patches)
 
         self.num_patches = num_patches
         self.output_orientations = output_orientations
         self.scene_size = scene_size
         self.patch_size = patch_size
+        self.refine_patches = refine_patches
+        if not refine_patches:
+            self.full_masks = nn.Parameter(
+                torch.ones(self.num_patches, self.patch_size, self.patch_size),
+                requires_grad=False
+            )
 
     def forward(self, z):
-        masks = self.masks(z)
-        masks = masks.view(-1, self.num_patches, self.patch_size, self.patch_size)
+        if self.refine_patches:
+            masks = (1. - self.masks(z))  # starts at zero, which should be opaque
+            masks = masks.view(-1, self.num_patches, self.patch_size, self.patch_size)
+        else:
+            masks = torch.ones_like(self.full_masks)[None, ...].repeat(z.shape[0], 1, 1, 1)
         transforms = self.patch_transforms(z)
         transforms = transforms.view(-1, self.num_patches, 2, 3)
         masks = masks.permute(1, 0, 2, 3)  # PBHW
