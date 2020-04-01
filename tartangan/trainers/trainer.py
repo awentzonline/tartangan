@@ -35,6 +35,7 @@ class Trainer:
             self.run_id = self._generate_run_id()
         else:
             self.run_id = args.run_id
+
         os.makedirs(self.output_root, exist_ok=True)
         self._save_cli_arguments()
 
@@ -103,6 +104,7 @@ class Trainer:
         try:
             self.components.invoke('train_begin', steps, logs)
             for epoch_i in range(self.args.epochs):
+                print(f'Starting epoch {epoch_i + 1}')
                 self.components.invoke('epoch_begin', steps, epoch_i, logs)
                 loader_iter = self.tqdm_class()(train_loader, **self.tqdm_kwargs())
                 for batch_i, images in enumerate(loader_iter):
