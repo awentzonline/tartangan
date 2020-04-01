@@ -33,7 +33,7 @@ class CNNTrainer(Trainer):
             'id': nn.Identity,
             'bn': nn.BatchNorm2d,
         }[self.args.norm]
-        d_norm_factory = nn.Identity
+        d_norm_factory = g_norm_factory  # nn.Identity
         g_input_factory = {
             'mlp': GeneratorInputMLP,
             'tiledz': TiledZGeneratorInput,
