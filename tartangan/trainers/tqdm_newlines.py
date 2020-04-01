@@ -30,7 +30,7 @@ def tqdm_class(use_newlines=False):
     if use_newlines:
         return TqdmNewLines
     else:
-        return tqdm.tqdm
+        return tqdm
 
 
 def tqdm_kwargs(quiet=False, log_iters=1000):
