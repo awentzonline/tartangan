@@ -20,3 +20,28 @@ def save_cli_arguments(filename, fromfile_prefix='@'):
 
     with smart_open.open(filename, 'w') as outfile:
         outfile.write('\n'.join(args))
+
+
+def type_or_none(default_type):
+    """
+    Convert the string 'None' to the value `None`.
+
+    >>> f = type_or_none(int)
+    >>> f(None) is None
+    True
+    >>> f('None') is None
+    True
+    >>> f(123)
+    123
+    """
+    def f(value):
+        if value is None or value == 'None':
+            return None
+        return default_type(value)
+    return f
+
+
+if __name__ == '__main__':
+    import doctest
+
+    doctest.testmod(verbose=True)

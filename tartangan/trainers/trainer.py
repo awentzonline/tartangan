@@ -19,7 +19,7 @@ from tartangan.trainers.components.metrics import (
     FIDComponent, KatibMetricsComponent, KubeflowMetricsComponent,
     TensorboardComponent
 )
-from tartangan.utils.cli import save_cli_arguments
+from tartangan.utils.cli import save_cli_arguments, type_or_none
 from .components.container import ComponentContainer
 from .components.model_checkpoint import ModelCheckpointComponent
 from .components.image_sampler import ImageSamplerComponent
@@ -53,7 +53,7 @@ class Trainer:
             ImageSamplerComponent(), ModelCheckpointComponent(),
         )
 
-        if self.args.inception_moments and self.args.inception_moments != 'None':
+        if self.args.inception_moments:
             self.components.add_components(FIDComponent())
 
         if self.args.metrics_collector:
@@ -290,17 +290,17 @@ class Trainer:
                        help='Log progress updates one per line')
         p.add_argument('--test-freq', default=10000, type=int,
                        help='Calculate test metrics every N batches')
-        p.add_argument('--inception-moments', default='None',
+        p.add_argument('--inception-moments', type=type_or_none(str), default=None,
                        help='Path to pre-calculated inception moments')
         p.add_argument('--n-inception-imgs', default=1000, type=int)
         p.add_argument('--metrics-path', default=None,
                        help='Where to output a file containing run metrics')
         p.add_argument('--metrics-collector', default=None,
                        help='Which metric collector to use (katib, kubeflow, tensorflow)')
-        p.add_argument('--resume-training-step', type=int, default=None,
+        p.add_argument('--resume-training-step', type=type_or_none(int), default=None,
                        help='Resume training from the checkpoint corresponding to this step '
                        'found in the output path specified by the --run-id option.')
-        p.add_argument('--run-id', default=None,
+        p.add_argument('--run-id', type=type_or_none(str), default=None,
                        help='Explicitly set a run id. Otherwise, one will '
                        'be generated automatically.')
         p.add_argument('--cleanup-inception-model', action='store_true',
