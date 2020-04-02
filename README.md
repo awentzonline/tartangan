@@ -41,3 +41,9 @@ First precalculate the inception moments of the dataset with:
 Then run the trainer with the `--inception-moments=$IM_FILENAME` argument. Calculating these takes a bit of time. You can choose how frequently to run the tests with `--test-freq` and the number of samples drawn from the generator with `--n-inception-imgs`.
 
 The scores will be printed during training and you can choose to have it output final scores to a JSON-encoded file with `--metrics-path`. Currently, this file is formatted for use with scalar metrics in a [Kubeflow Pipeline](https://www.kubeflow.org/docs/pipelines/overview/pipelines-overview/).
+
+Resume from checkpoint
+----------------------
+To resume training, specify the CLI arguments `--run-id` and `--resume-training-step`
+`run_id` is the path segment which looks like a datetime with a random suffix and
+`resume-training-step` should be a number that appears in the checkpoints directory.

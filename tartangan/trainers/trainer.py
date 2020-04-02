@@ -42,6 +42,9 @@ class Trainer:
         self.components = ComponentContainer()
         self.components.trainer = self
 
+        self.steps = 0
+        self.epoch = 1
+
     def build_models(self):
         pass
 
@@ -99,35 +102,34 @@ class Trainer:
             self.dataset, batch_size=self.args.batch_size, shuffle=True, drop_last=True
         )
         self.setup_components()
-        steps = 0
         logs = defaultdict(list)
         try:
-            self.components.invoke('train_begin', steps, logs)
-            for epoch_i in range(self.args.epochs):
-                print(f'Starting epoch {epoch_i + 1}')
-                self.components.invoke('epoch_begin', steps, epoch_i, logs)
+            self.components.invoke('train_begin', self.steps, logs)
+            while self.epoch <= self.args.epochs:
+                print(f'Starting epoch {self.epoch}')
+                self.components.invoke('epoch_begin', self.steps, self.epoch, logs)
                 loader_iter = self.tqdm_class()(train_loader, **self.tqdm_kwargs())
                 for batch_i, images in enumerate(loader_iter):
-                    self.components.invoke('batch_begin', steps, logs)
+                    self.components.invoke('batch_begin', self.steps, logs)
                     training_metrics = self.train_batch(images)
                     for name, value in training_metrics.items():
                         logs[name].append(value)
-                    self.components.invoke('batch_end', steps, logs)
+                    self.components.invoke('batch_end', self.steps, logs)
                     # update progress bar
                     pretty_training_metrics = {
                         k: round(v, 4) for k, v in training_metrics.items()
                     }
                     loader_iter.set_postfix(refresh=False, **pretty_training_metrics)
-                    steps += 1
+                    self.steps += 1
 
-                self.components.invoke('epoch_end', steps, epoch_i, logs)
+                self.components.invoke('epoch_end', self.steps, self.epoch, logs)
                 # TODO: extract dataset cacher to component
-                if epoch_i == 0 and self.args.cache_dataset:
+                if self.epoch == 1 and self.args.cache_dataset:
                     if hasattr(self.dataset, 'save_cache'):
                         self.dataset.save_cache(self.dataset_cache_path(self.g.max_size))
         except KeyboardInterrupt:
             pass  # Graceful interrupt
-        self.components.invoke('train_end', steps, logs)
+        self.components.invoke('train_end', self.steps, logs)
 
     def dataset_cache_path(self, size):
         # TODO: extract to component
@@ -203,6 +205,16 @@ class Trainer:
             return dict(
                 mininterval=0, maxinterval=np.inf, miniters=self.args.log_iters
             )
+
+    def get_state(self):
+        return dict(
+            epoch=self.epoch,
+            steps=self.steps,
+        )
+
+    def set_state(self, state):
+        for key, value in state.items():
+            setattr(self, key, value)
 
     def _save_cli_arguments(self):
         save_cli_arguments(f'{self.output_root}/config.args')
@@ -285,9 +297,9 @@ class Trainer:
                        help='Where to output a file containing run metrics')
         p.add_argument('--metrics-collector', default=None,
                        help='Which metric collector to use (katib, kubeflow, tensorflow)')
-        p.add_argument('--resume-training-id', type=str, default=None,
-                       help='Resume training from the last checkpoint in the '
-                       'output path with this run id')
+        p.add_argument('--resume-training-step', type=int, default=None,
+                       help='Resume training from the checkpoint corresponding to this step '
+                       'found in the output path specified by the --run-id option.')
         p.add_argument('--run-id', default=None,
                        help='Explicitly set a run id. Otherwise, one will '
                        'be generated automatically.')
