@@ -20,6 +20,7 @@ from tartangan.trainers.components.metrics import (
     TensorboardComponent
 )
 from tartangan.utils.cli import save_cli_arguments, type_or_none
+from tartangan.utils.fs import maybe_makedirs
 from .components.container import ComponentContainer
 from .components.model_checkpoint import ModelCheckpointComponent
 from .components.image_sampler import ImageSamplerComponent
@@ -36,7 +37,7 @@ class Trainer:
         else:
             self.run_id = args.run_id
 
-        os.makedirs(self.output_root, exist_ok=True)
+        maybe_makedirs(self.output_root, exist_ok=True)
         self._save_cli_arguments()
 
         self.components = ComponentContainer()

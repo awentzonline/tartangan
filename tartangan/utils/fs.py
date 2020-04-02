@@ -1,7 +1,7 @@
 import os
 
 
-def maybe_mkdirs(path, exist_ok=True):
+def maybe_makedirs(path, exist_ok=True):
     """Don't mkdir if it's a path on S3"""
     if path.startswith('s3://'):
         return

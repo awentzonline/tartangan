@@ -4,13 +4,14 @@ import smart_open
 import torch
 import torchvision
 
+from tartangan.utils.fs import maybe_makedirs
 from tartangan.utils.slerp import slerp_grid
 from .base import TrainerComponent
 
 
 class ImageSamplerComponent(TrainerComponent):
     def on_train_begin(self, steps, logs):
-        os.makedirs(os.path.dirname(self.sample_root + '/'), exist_ok=True)
+        maybe_makedirs(os.path.dirname(self.sample_root + '/'), exist_ok=True)
         self.progress_samples = self.trainer.sample_z(32)
 
     def on_train_end(self, steps, logs):

@@ -3,8 +3,8 @@ import pickle
 
 from torchvision.datasets import VisionDataset
 from torchvision.datasets.folder import IMG_EXTENSIONS, pil_loader
-from torchvision.datasets.utils import list_files
-from torchvision import transforms
+
+from tartangan.utils.fs import maybe_makedirs
 
 
 class ImageFolderDataset(VisionDataset):
@@ -32,7 +32,7 @@ class ImageFolderDataset(VisionDataset):
 
     def save_cache(self, filename):
         if os.path.dirname(filename):
-            os.makedirs(os.path.dirname(filename), exist_ok=True)
+            maybe_makedirs(os.path.dirname(filename), exist_ok=True)
         with open(filename, 'wb') as outfile:
             pickle.dump(self._image_cache, outfile)
 

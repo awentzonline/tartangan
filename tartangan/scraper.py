@@ -10,12 +10,14 @@ import time
 
 import requests
 
+from tartangan.utils.fs import maybe_makedirs
+
 
 def scrape_tartans(args):
     """
     Slowly, serially download images so as not to wear out our welcome.
     """
-    os.makedirs(args.output_path, exist_ok=True)
+    maybe_makedirs(args.output_path, exist_ok=True)
     print('Scraping tartans')
     # prepare list of ids to scrape, possibly resume work
     ids_to_scrape = load_state(args.state)

@@ -4,6 +4,7 @@ import os
 import smart_open
 
 from tartangan.trainers.components.base import TrainerComponent
+from tartangan.utils.fs import maybe_makedirs
 from tartangan.utils.kubeflow import key_to_kf_name
 
 
@@ -25,6 +26,6 @@ class KubeflowMetricsComponent(TrainerComponent):
         )
         dirname = os.path.dirname(self.output_path)
         if dirname:
-            os.makedirs(dirname, exist_ok=True)
+            maybe_makedirs(dirname, exist_ok=True)
         with smart_open.open(self.output_path, 'w') as outfile:
             json.dump(output, outfile)

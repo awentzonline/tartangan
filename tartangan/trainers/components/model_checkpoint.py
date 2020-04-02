@@ -4,7 +4,7 @@ import os
 import smart_open
 import torch
 
-from tartangan.utils.fs import maybe_mkdirs
+from tartangan.utils.fs import maybe_makedirs
 from .base import TrainerComponent
 
 
@@ -23,7 +23,7 @@ class ModelCheckpointComponent(TrainerComponent):
         self.save_checkpoint(steps)
 
     def save_checkpoint(self, steps):
-        maybe_mkdirs(self.checkpoint_root)
+        maybe_makedirs(self.checkpoint_root)
         print(f'saving checkpoint to {self.checkpoint_root}')
         model_filenames = (
             (self.trainer.g, 'g.pt'),
