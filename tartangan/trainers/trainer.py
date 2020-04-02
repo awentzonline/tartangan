@@ -127,6 +127,7 @@ class Trainer:
                 if self.epoch == 1 and self.args.cache_dataset:
                     if hasattr(self.dataset, 'save_cache'):
                         self.dataset.save_cache(self.dataset_cache_path(self.g.max_size))
+                self.epoch += 1
         except KeyboardInterrupt:
             pass  # Graceful interrupt
         self.components.invoke('train_end', self.steps, logs)
