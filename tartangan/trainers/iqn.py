@@ -89,6 +89,7 @@ class IQNTrainer(Trainer):
             self.init_params_selu(self.g.parameters())
             self.init_params_selu(self.d.parameters())
         self.update_target_generator(1.)  # copy weights
+        self.bce_loss = nn.BCELoss()
 
     def init_params_selu(self, params):
         for p in params:
@@ -117,6 +118,9 @@ class IQNTrainer(Trainer):
         p_labels_real, d_loss_real = self.d(real, targets=labels[:len(labels) // 2])
         p_labels_fake, d_loss_fake = self.d(fake.detach(), targets=labels[len(labels) // 2:])
         d_loss = d_loss_real + d_loss_fake
+        p_labels = torch.cat([p_labels_real, p_labels_fake], dim=0)
+        d_loss += self.bce_loss(torch.softmax(p_labels, dim=-1), labels)
+
         d_grad_penalty = 0.
         if self.args.grad_penalty:
             d_grad_penalty = self.args.grad_penalty * gradient_penalty(p_labels_real, real)
