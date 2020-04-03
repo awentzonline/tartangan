@@ -135,6 +135,7 @@ class IQNTrainer(Trainer):
         batch_imgs, labels = self.make_generator_batch(imgs)
         #torchvision.utils.save_image(batch_imgs, 'batch.png', normalize=True, range=(-1, 1))
         p_labels, g_loss = self.d(batch_imgs, targets=labels)
+        g_loss += self.bce_loss(torch.softmax(p_labels, dim=-1), labels)
         g_loss.backward()
         self.optimizer_g.step()
 
