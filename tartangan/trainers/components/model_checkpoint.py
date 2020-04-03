@@ -4,7 +4,7 @@ import os
 import smart_open
 import torch
 
-from tartangan.utils.fs import maybe_makedirs
+from tartangan.utils.fs import maybe_makedirs, smart_ls
 from .base import TrainerComponent
 
 
@@ -12,12 +12,18 @@ class ModelCheckpointComponent(TrainerComponent):
     """Saves the models at regular intervals."""
 
     def on_train_begin(self, steps, logs):
+        self._loaded_from = None
         if self.trainer.args.resume_training_step:
+            self.trainer.steps = self.trainer.args.resume_training_step
             self.load_checkpoint()
+        elif self.trainer.args.resume_training_latest:
+            self.resume_training_from_latest()
 
     def on_batch_end(self, steps, logs):
         if steps and steps % self.trainer.args.checkpoint_freq == 0:
-            self.save_checkpoint(steps)
+            # Prevent immediate re-saving of checkpoint
+            if self._loaded_from != steps:
+                self.save_checkpoint(steps)
 
     def on_train_end(self, steps, logs):
         self.save_checkpoint(steps)
@@ -43,9 +49,8 @@ class ModelCheckpointComponent(TrainerComponent):
             json.dump(state, outfile)
 
     def load_checkpoint(self):
-        # This must come first
-        self.trainer.steps = self.trainer.args.resume_training_step
         print(f'resuming from checkpoint {self.checkpoint_root}')
+        self._loaded_from = self.trainer.steps
 
         model_filenames = (
             ('g', 'g.pt'),
@@ -67,6 +72,35 @@ class ModelCheckpointComponent(TrainerComponent):
             state = json.load(infile)
         self.trainer.set_state(state)
 
+    def resume_training_from_latest(self):
+        latest_id = self.latest_checkpoint_id()
+        if latest_id is not None:
+            self.trainer.steps = latest_id
+            self.load_checkpoint()
+        else:
+            print('No checkpoints found to resume.')
+
+    def latest_checkpoint_id(self):
+        """Find the latest checkpoint id in the checkpoints directory."""
+        subdirs = smart_ls(self.all_checkpoints_root)
+        int_dirs = []
+        for key in subdirs:
+            try:
+                key = int(key)
+            except ValueError:
+                pass
+            else:
+                int_dirs.append(key)
+
+        if not int_dirs:
+            return None
+        latest = list(sorted(int_dirs))[-1]
+        return latest
+
     @property
     def checkpoint_root(self):
-        return f'{self.trainer.output_root}/checkpoints/{self.trainer.steps}'
+        return f'{self.all_checkpoints_root}/{self.trainer.steps}'
+
+    @property
+    def all_checkpoints_root(self):
+        return f'{self.trainer.output_root}/checkpoints'

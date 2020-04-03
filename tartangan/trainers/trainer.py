@@ -305,6 +305,8 @@ class Trainer:
         p.add_argument('--run-id', type=type_or_none(str), default=None,
                        help='Explicitly set a run id. Otherwise, one will '
                        'be generated automatically.')
+        p.add_argument('--resume-training-latest', action='store_true',
+                       help='Resume training from latest checkpoint for given run_id.')
         p.add_argument('--cleanup-inception-model', action='store_true',
                        help='Delete pretrained inception model used for FID metric.')
 
