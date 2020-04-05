@@ -119,7 +119,7 @@ class IQNTrainer(Trainer):
         p_labels_fake, d_loss_fake = self.d(fake.detach(), targets=labels[len(labels) // 2:])
         d_loss = d_loss_real + d_loss_fake
         p_labels = torch.cat([p_labels_real, p_labels_fake], dim=0)
-        d_loss += self.mse_loss(p_labels, labels)
+        #d_loss += self.mse_loss(p_labels, labels)
 
         d_grad_penalty = 0.
         if self.args.grad_penalty:
@@ -135,7 +135,7 @@ class IQNTrainer(Trainer):
         batch_imgs, labels = self.make_generator_batch(imgs)
         #torchvision.utils.save_image(batch_imgs, 'batch.png', normalize=True, range=(-1, 1))
         p_labels, g_loss = self.d(batch_imgs, targets=labels)
-        g_loss += self.mse_loss(p_labels, labels)
+        #g_loss += self.mse_loss(p_labels, labels)
         g_loss.backward()
         self.optimizer_g.step()
 
