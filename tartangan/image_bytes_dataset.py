@@ -44,6 +44,8 @@ class ImageBytesDataset(Dataset):
     def from_path(cls, path, transform=None):
         infile = smart_open.open(path, 'rb')
         images = np.load(infile)
+        if isinstance(images, np.lib.npyio.NpzFile):
+            images = images['images']
         return cls(images, transform=transform)
 
 
@@ -87,4 +89,4 @@ if __name__ == '__main__':
     )
     print(f'saving dataset to "{args.destination}"')
     with smart_open.open(args.destination, 'wb') as outfile:
-        np.save(outfile, data)
+        np.savez_compressed(outfile, images=data)
