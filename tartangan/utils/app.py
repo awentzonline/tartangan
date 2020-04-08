@@ -11,6 +11,11 @@ class App:
         pass
 
     @classmethod
+    def run_from_cli(cls):
+        app = cls.create_from_cli()
+        app.run()
+
+    @classmethod
     def create_from_cli(cls):
         args = cls.parse_cli_args()
         obj = cls(args)
