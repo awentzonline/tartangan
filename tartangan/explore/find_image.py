@@ -60,7 +60,7 @@ class FindImage(GOutputApp):
             ):
                 img_feats = feature_extractor(vgg_imgs)
                 loss = loss + mse_loss(img_feats, target_feats)
-            loss += z.pow(2).mean()
+            loss += z.pow(2).mean() * self.args.l2
             loss.backward()
             optimizer.step()
             z_min, z_mean, z_max = float(z.min()), float(z.mean()), float(z.max())
@@ -102,6 +102,7 @@ class FindImage(GOutputApp):
         p.add_argument('--lr', default=0.001, type=float)
         p.add_argument('--vgg-layers', default=(9, 16, 23), type=int, nargs='+')
         p.add_argument('--optimizer', default='sgd')
+        p.add_argument('--l2', default=0.001, type=float)
 
 
 if __name__ == '__main__':
