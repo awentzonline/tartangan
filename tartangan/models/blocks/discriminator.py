@@ -10,10 +10,11 @@ from ..layers import Interpolate
 
 class DiscriminatorInput(nn.Module):
     def __init__(self, in_dims, out_dims,
+                 conv_factory=nn.Conv2d,
                  activation_factory=functools.partial(nn.LeakyReLU, 0.2)):
         super().__init__()
         self.convs = nn.Sequential(
-            nn.Conv2d(in_dims, out_dims, 1, padding=0, bias=True),
+            conv_factory(in_dims, out_dims, 1, padding=0, bias=True),
         #    activation_factory(),  # Is this blowing things up?
         )
 
@@ -24,16 +25,18 @@ class DiscriminatorInput(nn.Module):
 class DiscriminatorBlock(nn.Module):
     def __init__(self, in_dims, out_dims, first_block=False,
                  norm_factory=nn.BatchNorm2d,
+                 conv_factory=nn.Conv2d,
+                 avg_pool_factory=nn.AvgPool2d,
                  activation_factory=functools.partial(nn.LeakyReLU, 0.2)):
         super().__init__()
         layers = [
             norm_factory(out_dims),
             activation_factory(),
-            nn.Conv2d(in_dims, out_dims, 3, padding=1, bias=True),
+            conv_factory(in_dims, out_dims, 3, padding=1, bias=True),
             norm_factory(out_dims),
             activation_factory(),
-            nn.Conv2d(out_dims, out_dims, 3, padding=1, bias=True),
-            nn.AvgPool2d(2),
+            conv_factory(out_dims, out_dims, 3, padding=1, bias=True),
+            avg_pool_factory(2),
         ]
         if first_block:
             layers = layers[2:]
@@ -46,16 +49,18 @@ class DiscriminatorBlock(nn.Module):
 class ResidualDiscriminatorBlock(nn.Module):
     def __init__(self, in_dims, out_dims, first_block=False,
                  norm_factory=nn.BatchNorm2d,
+                 conv_factory=nn.Conv2d,
+                 avg_pool_factory=nn.AvgPool2d,
                  activation_factory=functools.partial(nn.LeakyReLU, 0.2)):
         super().__init__()
         layers = [
             norm_factory(in_dims),
             activation_factory(),
-            nn.Conv2d(in_dims, out_dims, 3, padding=1, bias=True),
+            conv_factory(in_dims, out_dims, 3, padding=1, bias=True),
             norm_factory(out_dims),
             activation_factory(),
-            nn.Conv2d(out_dims, out_dims, 3, padding=1, bias=True),
-            nn.AvgPool2d(2),
+            conv_factory(out_dims, out_dims, 3, padding=1, bias=True),
+            avg_pool_factory(2),
         ]
         if first_block:
             layers = layers[2:]
@@ -66,7 +71,7 @@ class ResidualDiscriminatorBlock(nn.Module):
         if in_dims != out_dims:
             # self.project_input = self._project_input
             self.project_input = nn.Sequential(
-                nn.Conv2d(in_dims, out_dims, 1)
+                conv_factory(in_dims, out_dims, 1)
             )
         # map(nn.init.orthogonal_, self.parameters())
 
@@ -88,13 +93,14 @@ class ResidualDiscriminatorBlock(nn.Module):
 class DiscriminatorPoolOnlyOutput(nn.Module):
     def __init__(self, in_dims, out_dims, pool='sum',
                  norm_factory=nn.BatchNorm2d,
+                 conv_factory=nn.Conv2d,
                  activation_factory=functools.partial(nn.LeakyReLU, 0.2)):
         super().__init__()
         kernel_size = 4 if pool == 'conv' else 1
         self.convs = nn.Sequential(
             norm_factory(in_dims),
             activation_factory(),
-            nn.Conv2d(in_dims, out_dims, kernel_size, padding=0, bias=True),
+            conv_factory(in_dims, out_dims, kernel_size, padding=0, bias=True),
             # nn.Sigmoid()
         )
         self.pool = pool

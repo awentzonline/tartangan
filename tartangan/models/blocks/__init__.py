@@ -11,6 +11,7 @@ from .discriminator import (  # noqa
     ResidualDiscriminatorBlock,
 )
 from .generator import (  # noqa
-    GeneratorBlock, GeneratorInputMLP, GeneratorOutput,
+    GeneratorBlock, GeneratorInputMLP, GeneratorInputMLP1d,
+    GeneratorOutput,
     ResidualGeneratorBlock, TiledZGeneratorInput
 )
