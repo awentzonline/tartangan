@@ -162,3 +162,55 @@ class IQNDiscriminatorOutput(nn.Module):
         if targets is not None:
             return p_target, loss
         return p_target
+
+
+class MultiModelDiscriminatorOutput(nn.Module):
+    def __init__(self, in_dims, out_dims, output_model_factories,
+                 norm_factory=nn.BatchNorm2d,
+                 activation_factory=functools.partial(nn.LeakyReLU, 0.2)):
+        super().__init__()
+        self.activation = nn.Sequential(
+            norm_factory(in_dims),
+            activation_factory(),
+        )
+        self.output_models = nn.ModuleList([
+            factory(in_dims)
+            for factory in output_model_factories
+        ])
+
+    def forward(self, feats):
+        feats = self.activation(feats)
+        feats = torch.sum(feats, [2, 3])  # sum pool
+        ys = [
+            model(feats) for model in self.output_models
+        ]
+        return ys
+
+
+class LinearOutput(nn.Module):
+    def __init__(self, in_dims, out_dims, activation_factory=nn.Identity):
+        super().__init__()
+        self.xform = nn.Sequential(
+            nn.Linear(in_dims, out_dims),
+            activation_factory(),
+        )
+
+    def forward(self, x):
+        return self.xform(x)
+
+
+class GaussianParametersOutput(nn.Module):
+    def __init__(self, in_dims, out_dims,
+                 activation_factory=functools.partial(nn.LeakyReLU, 0.2)):
+        super().__init__()
+        self.mu_log_sigma = nn.Sequential(
+            nn.Linear(in_dims, in_dims),
+            activation_factory(),
+            nn.Linear(in_dims, 2 * out_dims)
+        )
+        self.out_dims = out_dims
+
+    def forward(self, x):
+        mu_log_sigma = self.mu_log_sigma(x)
+        mu, log_sigma = mu_log_sigma[:, :self.out_dims], mu_log_sigma[:, self.out_dims:]
+        return mu, log_sigma

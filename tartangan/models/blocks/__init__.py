@@ -5,7 +5,10 @@ from .scene import (  # noqa
 from .discriminator import (  # noqa
     DiscriminatorBlock, DiscriminatorInput, DiscriminatorOutput,
     DiscriminatorPoolOnlyOutput,
-    IQNDiscriminatorOutput, ResidualDiscriminatorBlock,
+    IQNDiscriminatorOutput,
+    LinearOutput, GaussianParametersOutput,
+    MultiModelDiscriminatorOutput,
+    ResidualDiscriminatorBlock,
 )
 from .generator import (  # noqa
     GeneratorBlock, GeneratorInputMLP, GeneratorOutput,
