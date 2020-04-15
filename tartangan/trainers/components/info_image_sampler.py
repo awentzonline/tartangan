@@ -31,18 +31,13 @@ class InfoImageSamplerComponent(ImageSamplerComponent):
         self.continuous_samples[:, -1, -1] = pts
 
         # render an image for each category
+        num_cat_samples = 3  # including the base_z used with continuous vars
+        base_z = torch.cat([base_z, self.trainer.sample_z(num_cat_samples - 1)], dim=0)
         self.categorical_samples = (
-            base_z.repeat(self.trainer.args.info_cat_dims, 1)
+            base_z[:, None, ...].repeat(1, self.trainer.args.info_cat_dims, 1)
         )
-        self.categorical_samples[..., :self.trainer.args.info_cat_dims] = 0.
-        cats = list(range(self.trainer.args.info_cat_dims))
-        self.categorical_samples[cats, ..., cats] = 1.
-        more_cat_samples = self.trainer.sample_z(1).repeat(self.trainer.args.info_cat_dims, 1)
-        more_cat_samples[..., :self.trainer.args.info_cat_dims] = \
-            self.categorical_samples[..., :self.trainer.args.info_cat_dims]
-        self.categorical_samples = torch.stack([
-            self.categorical_samples, more_cat_samples
-        ], dim=0)
+        cat_sweep = torch.eye(self.trainer.args.info_cat_dims)
+        self.categorical_samples[..., :self.trainer.args.info_cat_dims] = cat_sweep
 
     def output_samples(self, filename, n=None):
         with torch.no_grad():
