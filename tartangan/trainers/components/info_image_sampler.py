@@ -42,7 +42,8 @@ class InfoImageSamplerComponent(ImageSamplerComponent):
     def output_samples(self, filename, n=None):
         with torch.no_grad():
             for name, samples in (
-                ('cat', self.categorical_samples), ('cont', self.continuous_samples)):
+                ('cat', self.categorical_samples), ('cont', self.continuous_samples)
+            ):
                 grid_imgs = self.trainer.target_g(samples)
                 grid_filename = os.path.join(
                     os.path.dirname(filename), f'info_{name}_{os.path.basename(filename)}'
