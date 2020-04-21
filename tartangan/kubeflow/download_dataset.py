@@ -9,21 +9,12 @@ from .base_metadata_app import BaseMetadataApp
 class DownloadDatasetMetadata(BaseMetadataApp):
     def run(self):
         super().run()
-        datasets = self.find_datasets_by_name(self.args.dataset_name)
+        datasets = self.find_metadata_datasets_by_name(self.args.dataset_name)
         # TODO: need to sort to get latest?
         dataset = datasets[-1]
         with smart_open.open(dataset['uri'], 'rb') as infile:
             with smart_open.open(self.args.output_path, 'wb') as outfile:
                 outfile.write(infile.read())
-
-    def find_datasets_by_name(self, name):
-        artifacts = self.metadata_workspace.list(metadata.DataSet.ARTIFACT_TYPE_NAME)
-        print(artifacts)
-        matches = [
-            artifact for artifact in artifacts
-            if artifact['name'] == name
-        ]
-        return matches
 
     @classmethod
     def add_args_to_parser(cls, p):
