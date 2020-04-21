@@ -1,6 +1,3 @@
-import os
-
-from kubeflow.metadata import metadata
 import smart_open
 
 from .base_metadata_app import BaseMetadataApp
