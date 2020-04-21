@@ -17,7 +17,7 @@ class DownloadDatasetMetadata(BaseMetadataApp):
                 outfile.write(infile.read())
 
     def find_datasets_by_name(self, name):
-        artifacts = self.workspace.list(metadata.DataSet.ARTIFACT_TYPE_NAME)
+        artifacts = self.metadata_workspace.list(metadata.DataSet.ARTIFACT_TYPE_NAME)
         print(artifacts)
         matches = [
             artifact for artifact in artifacts
