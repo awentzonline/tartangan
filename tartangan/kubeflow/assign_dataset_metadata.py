@@ -1,15 +1,14 @@
-import os
-
 from kubeflow.metadata import metadata
 
 from .base_metadata_app import BaseMetadataApp
+from .metadata_mixin import MetadataMixin
 
 
-class AssignDatasetMetadata(BaseMetadataApp):
+class AssignDatasetMetadata(BaseMetadataApp, MetadataMixin):
     def run(self):
         super().run()
         exec = metadata.Execution(
-            'assign-dataset-metadata', workspace=self.workspace
+            'assign-dataset-metadata', workspace=self.metadata_workspace
         )
         ds = metadata.DataSet(
             name=self.args.dataset_name,
