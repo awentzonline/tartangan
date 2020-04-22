@@ -1,5 +1,4 @@
 import json
-import os
 
 import smart_open
 import torch
@@ -12,6 +11,7 @@ class ModelCheckpointComponent(TrainerComponent):
     """Saves the models at regular intervals."""
 
     def on_train_begin(self, steps, logs):
+        # Potentially load model checkpoint
         self._loaded_from = None
         if self.trainer.args.resume_training_step:
             self.trainer.steps = self.trainer.args.resume_training_step
