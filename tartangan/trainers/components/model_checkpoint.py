@@ -3,6 +3,7 @@ import json
 import smart_open
 import torch
 
+from tartangan.utils.cli import type_or_none
 from tartangan.utils.fs import maybe_makedirs, smart_ls
 from .base import TrainerComponent
 
@@ -104,3 +105,13 @@ class ModelCheckpointComponent(TrainerComponent):
     @property
     def all_checkpoints_root(self):
         return f'{self.trainer.output_root}/checkpoints'
+
+    @classmethod
+    def add_args_to_parser(self, parser):
+        parser.add_argument('--checkpoint-freq', type=int, default=100000,
+                       help='Output a checkpoint every N batches')
+        parser.add_argument('--resume-training-step', type=type_or_none(int), default=None,
+                       help='Resume training from the checkpoint corresponding to this step '
+                       'found in the output path specified by the --run-id option.')
+        parser.add_argument('--resume-training-latest', action='store_true',
+                       help='Resume training from latest checkpoint for given run_id.')
