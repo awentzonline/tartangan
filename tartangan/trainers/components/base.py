@@ -31,3 +31,7 @@ class TrainerComponent(abc.ABC):
     @trainer.setter
     def trainer(self, trainer):
         self._trainer = trainer
+
+    @classmethod
+    def add_args_to_parser(self, parser):
+        pass
