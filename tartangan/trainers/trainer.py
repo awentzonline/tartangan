@@ -29,7 +29,7 @@ from .utils import set_device_from_args
 
 
 class Trainer:
-    def __init__(self, args):
+    def __init__(self, args, components):
         self.args = args
 
         if args.run_id is None:
@@ -42,31 +42,13 @@ class Trainer:
 
         self.components = ComponentContainer()
         self.components.trainer = self
+        self.components.add_components(*components)
 
         self.steps = 0
         self.epoch = 1
 
     def build_models(self):
         pass
-
-    def setup_components(self):
-        self.components.add_components(
-            ImageSamplerComponent(), ModelCheckpointComponent(),
-        )
-
-        if self.args.inception_moments:
-            self.components.add_components(FIDComponent())
-
-        if self.args.metrics_collector:
-            metrics_collector_class = {
-                'katib': KatibMetricsComponent,
-                'kubeflow': KubeflowMetricsComponent,
-                'tensorboard': TensorboardComponent,
-            }[self.args.metrics_collector]
-            metrics_collector = metrics_collector_class(
-                self.args.metrics_path
-            )
-            self.components.add_components(metrics_collector)
 
     def prepare_dataset(self):
         img_size = self.g.max_size
@@ -102,7 +84,6 @@ class Trainer:
         train_loader = data_utils.DataLoader(
             self.dataset, batch_size=self.args.batch_size, shuffle=True, drop_last=True
         )
-        self.setup_components()
         logs = defaultdict(list)
         try:
             self.components.invoke('train_begin', self.steps, logs)
@@ -235,19 +216,55 @@ class Trainer:
         return f'{self.args.output}/{self.run_id}'
 
     @classmethod
-    def create_from_cli(cls):
-        args = cls.parse_cli_args()
-        set_device_from_args(args)
-        print(f'Using device "{args.device}"')
-        return cls(args)
+    def get_component_classes(cls, args):
+        classes = [
+            ImageSamplerComponent, ModelCheckpointComponent,
+        ]
+
+        if args.inception_moments:
+            classes.append(FIDComponent)
+
+        if args.metrics_collector:
+            metrics_collector_class = {
+                'katib': KatibMetricsComponent,
+                'kubeflow': KubeflowMetricsComponent,
+                'tensorboard': TensorboardComponent,
+            }[args.metrics_collector]
+            classes.append(metrics_collector_class)
+        return classes
 
     @classmethod
-    def parse_cli_args(cls):
-        p = argparse.ArgumentParser(
+    def create_from_cli(cls):
+        """
+        Instantiate this class using arguments from the CLI.
+
+        Each TrainerComponent knows how to add its config requirements to
+        a parser but we don't know which TrainerComponents are being used
+        until we read in some of the provided args.
+        """
+        # First parse the args defined on this Trainer class
+        base_parser = argparse.ArgumentParser(
             description='TartanGAN trainer', fromfile_prefix_chars='@'
         )
-        cls.add_args_to_parser(p)
-        return p.parse_args()
+        cls.add_args_to_parser(base_parser)
+        base_args = base_parser.parse_known_args()[0]
+
+        # Now gather the required TrainerComponents and add their args
+        # to the parser
+        component_classes = cls.get_component_classes(base_args)
+        full_parser = argparse.ArgumentParser(
+            description='TartanGAN trainer', fromfile_prefix_chars='@'
+        )
+        cls.add_args_to_parser(full_parser)
+        for component_class in component_classes:
+            component_class.add_args_to_parser(full_parser)
+        args = full_parser.parse_args()
+
+        set_device_from_args(args)
+        print(f'Using device "{args.device}"')
+
+        components = [cc() for cc in component_classes]
+        return cls(args, components)
 
     @classmethod
     def add_args_to_parser(cls, p):
