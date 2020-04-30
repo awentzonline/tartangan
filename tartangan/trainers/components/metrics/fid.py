@@ -2,8 +2,9 @@ import os
 import shutil
 import tempfile
 
-from tartangan.trainers.components.base import TrainerComponent
 from tartangan import inception_utils
+from tartangan.trainers.components.base import TrainerComponent
+from tartangan.utils.cli import type_or_none
 
 
 class FIDComponent(TrainerComponent):
@@ -27,7 +28,7 @@ class FIDComponent(TrainerComponent):
 
     def on_batch_end(self, steps, logs):
         """Calculate inception metrics"""
-        if steps and steps % self.trainer.args.test_freq == 0:
+        if steps and steps % self.trainer.args.fid_freq == 0:
             print('Calculating inception metrics...')
             is_mean, is_std, fid = self._calculate()
             logs['fid'].append(fid)
@@ -42,3 +43,13 @@ class FIDComponent(TrainerComponent):
         print('Inception Score is %3.3f +/- %3.3f' % (is_mean, is_std))
         print('FID is %5.4f' % (fid,))
         return is_mean, is_std, fid
+
+    @classmethod
+    def add_args_to_parser(self, parser):
+        parser.add_argument('--inception-moments', type=type_or_none(str), default=None,
+                            help='Path to pre-calculated inception moments')
+        parser.add_argument('--n-inception-imgs', default=1000, type=int)
+        parser.add_argument('--cleanup-inception-model', action='store_true',
+                            help='Delete pretrained inception model used for FID metric.')
+        parser.add_argument('--fid-freq', default=10000, type=int,
+                            help='Calculate test metrics every N batches')

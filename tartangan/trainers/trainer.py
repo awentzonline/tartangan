@@ -221,7 +221,7 @@ class Trainer:
             ImageSamplerComponent, ModelCheckpointComponent,
         ]
 
-        if args.inception_moments:
+        if args.fid:
             classes.append(FIDComponent)
 
         if args.metrics_collector:
@@ -305,11 +305,6 @@ class Trainer:
                        help='Progress logging frequency when --quiet-logs are enabled')
         p.add_argument('--log-progress-newlines', action='store_true',
                        help='Log progress updates one per line')
-        p.add_argument('--test-freq', default=10000, type=int,
-                       help='Calculate test metrics every N batches')
-        p.add_argument('--inception-moments', type=type_or_none(str), default=None,
-                       help='Path to pre-calculated inception moments')
-        p.add_argument('--n-inception-imgs', default=1000, type=int)
         p.add_argument('--metrics-path', default=None,
                        help='Where to output a file containing run metrics')
         p.add_argument('--metrics-collector', default=None,
@@ -317,8 +312,7 @@ class Trainer:
         p.add_argument('--run-id', type=type_or_none(str), default=None,
                        help='Explicitly set a run id. Otherwise, one will '
                        'be generated automatically.')
-        p.add_argument('--cleanup-inception-model', action='store_true',
-                       help='Delete pretrained inception model used for FID metric.')
+        p.add_argument('--fid', action='store_true', help='Calculate FID test metric')
 
 
 if __name__ == '__main__':
