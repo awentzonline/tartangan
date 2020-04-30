@@ -3,18 +3,15 @@ try:
 except ImportError:
     print('Tensorboard not available.')
 
-from tartangan.trainers.components.base import TrainerComponent
+from .base import FileBasedMetricsComponent
 
 
-class TensorboardComponent(TrainerComponent):
-    def __init__(self, output_path=None, whitelist=None):
-        self.output_path = output_path
-        self.whitelist = whitelist
+class TensorboardComponent(FileBasedMetricsComponent):
+    whitelist = None
 
     def on_train_begin(self, steps, logs):
-        if self.output_path:
-            self.output_path = f'{self.output_path}/{self.trainer.run_id}'
-        self.summary_writer = SummaryWriter(self.output_path)
+        metrics_path = f'{self.args.metrics_path}/{self.trainer.run_id}'
+        self.summary_writer = SummaryWriter(metrics_path)
 
     def on_batch_end(self, steps, logs):
         scalars = {

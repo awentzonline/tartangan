@@ -263,7 +263,7 @@ class Trainer:
         set_device_from_args(args)
         print(f'Using device "{args.device}"')
 
-        components = [cc() for cc in component_classes]
+        components = [cc(args) for cc in component_classes]
         return cls(args, components)
 
     @classmethod
@@ -305,10 +305,8 @@ class Trainer:
                        help='Progress logging frequency when --quiet-logs are enabled')
         p.add_argument('--log-progress-newlines', action='store_true',
                        help='Log progress updates one per line')
-        p.add_argument('--metrics-path', default=None,
-                       help='Where to output a file containing run metrics')
         p.add_argument('--metrics-collector', default=None,
-                       help='Which metric collector to use (katib, kubeflow, tensorflow)')
+                       help='Which metric collector to use (katib, kubeflow, tensorboard)')
         p.add_argument('--run-id', type=type_or_none(str), default=None,
                        help='Explicitly set a run id. Otherwise, one will '
                        'be generated automatically.')

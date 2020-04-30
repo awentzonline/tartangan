@@ -3,6 +3,8 @@ import abc
 
 class TrainerComponent(abc.ABC):
     """Interface for composable functionality in the Trainer."""
+    def __init__(self, args):
+        self.args = args
 
     def on_train_begin(self, steps, logs):
         pass
