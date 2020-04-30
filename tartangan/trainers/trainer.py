@@ -283,8 +283,6 @@ class Trainer:
         p.add_argument('--output', default='output',
                        help='Root of output locations. '
                             'A path segment unique to the run will be appended.')
-        p.add_argument('--checkpoint-freq', type=int, default=100000,
-                       help='Output a checkpoint every N batches')
         p.add_argument('--dataset-cache', default='cache/{root}_{size}.pkl',
                        help='Location of dataset cache when using ImageFolderDataset')
         p.add_argument('--grad-penalty', type=float, default=5.,
@@ -316,14 +314,9 @@ class Trainer:
                        help='Where to output a file containing run metrics')
         p.add_argument('--metrics-collector', default=None,
                        help='Which metric collector to use (katib, kubeflow, tensorflow)')
-        p.add_argument('--resume-training-step', type=type_or_none(int), default=None,
-                       help='Resume training from the checkpoint corresponding to this step '
-                       'found in the output path specified by the --run-id option.')
         p.add_argument('--run-id', type=type_or_none(str), default=None,
                        help='Explicitly set a run id. Otherwise, one will '
                        'be generated automatically.')
-        p.add_argument('--resume-training-latest', action='store_true',
-                       help='Resume training from latest checkpoint for given run_id.')
         p.add_argument('--cleanup-inception-model', action='store_true',
                        help='Delete pretrained inception model used for FID metric.')
 
