@@ -135,13 +135,17 @@ class InfoTrainer(Trainer):
         p_labels = torch.cat([p_labels_real, p_labels_fake], dim=0)
         d_loss = self.bce_loss(p_labels, labels)
         # infogan loss
-        z_cat_code = self.z_categorical_code(z)
-        z_cont_code = self.z_continuous_code(z)
-        p_z_cat_code = self.z_categorical_code(p_codes)
-        p_z_cont_code = self.z_continuous_code(p_codes)
-        d_cat_code_loss = self.bce_loss(p_z_cat_code, z_cat_code)
-        d_cont_code_loss = self.mse_loss(p_z_cont_code, z_cont_code)
-        d_code_loss = d_cat_code_loss + d_cont_code_loss
+        d_code_loss = 0
+        if self.args.info_cat_dims:
+            z_cat_code = self.z_categorical_code(z)
+            p_z_cat_code = self.z_categorical_code(p_codes)
+            d_cat_code_loss = self.bce_loss(p_z_cat_code, z_cat_code)
+            d_code_loss += d_cat_code_loss
+        if self.args.info_cont_dims:
+            z_cont_code = self.z_continuous_code(z)
+            p_z_cont_code = self.z_continuous_code(p_codes)
+            d_cont_code_loss = self.mse_loss(p_z_cont_code, z_cont_code)
+            d_code_loss += d_cont_code_loss
         d_loss += self.args.info_w * d_code_loss
 
         d_grad_penalty = 0.
@@ -159,13 +163,18 @@ class InfoTrainer(Trainer):
         p_labels, p_codes = self.d(batch_imgs)
         g_loss = self.bce_loss(p_labels, labels)
         # infogan loss
-        z_cat_code = self.z_categorical_code(z)
-        z_cont_code = self.z_continuous_code(z)
-        p_z_cat_code = self.z_categorical_code(p_codes)
-        p_z_cont_code = self.z_continuous_code(p_codes)
-        g_cat_code_loss = self.bce_loss(p_z_cat_code, z_cat_code)
-        g_cont_code_loss = self.mse_loss(p_z_cont_code, z_cont_code)
-        g_code_loss = g_cat_code_loss + g_cont_code_loss
+        g_code_loss = 0.
+        if self.args.info_cat_dims:
+            z_cat_code = self.z_categorical_code(z)
+            p_z_cat_code = self.z_categorical_code(p_codes)
+            g_cat_code_loss = self.bce_loss(p_z_cat_code, z_cat_code)
+            g_code_loss += g_cat_code_loss
+        if self.args.info_cont_dims:
+            z_cont_code = self.z_continuous_code(z)
+            p_z_cont_code = self.z_continuous_code(p_codes)
+            g_cont_code_loss = self.mse_loss(p_z_cont_code, z_cont_code)
+            g_code_loss += g_cont_code_loss
+
         g_loss += self.args.info_w * g_code_loss
 
         g_loss.backward()
@@ -195,9 +204,10 @@ class InfoTrainer(Trainer):
             n = self.args.batch_size
         z = torch.randn(n, self.gan_config.latent_dims).to(self.device)
         # set up the categorical dimensions
-        z[..., :self.args.info_cat_dims] = 0.
-        cats = np.random.randint(0, self.args.info_cat_dims, (n,))
-        z[np.arange(n), ..., cats] = 1.
+        if self.args.info_cat_dims:
+            z[..., :self.args.info_cat_dims] = 0.
+            cats = np.random.randint(0, self.args.info_cat_dims, (n,))
+            z[np.arange(n), ..., cats] = 1.
         return z
 
     def sample_g(self, n=None, target_g=False, **g_kwargs):
