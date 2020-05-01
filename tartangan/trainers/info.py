@@ -103,9 +103,11 @@ class InfoTrainer(Trainer):
         self.bce_loss = nn.BCEWithLogitsLoss()
         self.mse_loss = nn.MSELoss()
 
-    def setup_components(self):
-        super().setup_components()
-        self.components.add_components(InfoImageSamplerComponent())
+    @classmethod
+    def get_component_classes(self, args):
+        classes = super().get_component_classes(args)
+        classes.append(InfoImageSamplerComponent)
+        return classes
 
     def init_params_selu(self, params):
         for p in params:

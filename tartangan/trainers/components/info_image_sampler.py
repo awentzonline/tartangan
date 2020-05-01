@@ -14,7 +14,7 @@ class InfoImageSamplerComponent(ImageSamplerComponent):
     def on_train_begin(self, steps, logs):
         super().on_train_begin(steps, logs)
 
-        self.num_cont_dims = 4
+        self.num_cont_dims = min(4, self.trainer.args.info_cont_dims)
         self.num_points_per_dim = 7
         base_z = self.trainer.sample_z(1)
 
@@ -30,20 +30,25 @@ class InfoImageSamplerComponent(ImageSamplerComponent):
         # include row of a non-controlled dim
         self.continuous_samples[:, -1, -1] = pts
 
-        # render an image for each category
-        num_cat_samples = 3  # including the base_z used with continuous vars
-        base_z = torch.cat([base_z, self.trainer.sample_z(num_cat_samples - 1)], dim=0)
-        self.categorical_samples = (
-            base_z[:, None, ...].repeat(1, self.trainer.args.info_cat_dims, 1)
-        )
-        cat_sweep = torch.eye(self.trainer.args.info_cat_dims)
-        self.categorical_samples[..., :self.trainer.args.info_cat_dims] = cat_sweep
+        if self.trainer.args.info_cat_dims:
+            # render an image for each category
+            num_cat_samples = 3  # including the base_z used with continuous vars
+            base_z = torch.cat([base_z, self.trainer.sample_z(num_cat_samples - 1)], dim=0)
+            self.categorical_samples = (
+                base_z[:, None, ...].repeat(1, self.trainer.args.info_cat_dims, 1)
+            )
+            cat_sweep = torch.eye(self.trainer.args.info_cat_dims)
+            self.categorical_samples[..., :self.trainer.args.info_cat_dims] = cat_sweep
+        else:
+            self.categorical_samples = None
 
     def output_samples(self, filename, n=None):
         with torch.no_grad():
             for name, samples in (
                 ('cat', self.categorical_samples), ('cont', self.continuous_samples)
             ):
+                if samples is None:
+                    continue
                 grid_imgs = self.trainer.target_g(samples)
                 grid_filename = os.path.join(
                     os.path.dirname(filename), f'info_{name}_{os.path.basename(filename)}'
