@@ -29,10 +29,10 @@ class GOutputApp(App):
         with smart_open.open(g_filename, 'rb') as infile:
             self.g = torch.load(infile, map_location=self.args.device)
 
-    def save_image(self, img, filename):
+    def save_image(self, img, filename, range=(-1, 1)):
         with smart_open.open(filename, 'wb') as output_file:
             torchvision.utils.save_image(
-                img, output_file, normalize=True, range=(-1, 1), format='png'
+                img, output_file, normalize=True, range=range, format='png'
             )
 
     @classmethod
