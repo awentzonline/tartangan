@@ -1,3 +1,4 @@
+more-itertools==8.2.0
 numpy>=1.16
 requests==2.21.0
 scipy==1.2.1
