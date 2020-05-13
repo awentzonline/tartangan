@@ -40,7 +40,7 @@ class FindImage(GOutputApp):
                 )
         # optimize z
         recon_loss = dict(
-            mse=nn.MSELoss(), l1=nn.SmoothL1Loss()
+            mse=nn.MSELoss(reduction='sum'), l1=nn.SmoothL1Loss(reduction='sum')
         )[self.args.loss]
         z = self.sample_z(self.args.num_samples)
         z.requires_grad_(True)

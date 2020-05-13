@@ -21,13 +21,22 @@ class GOutputApp(App):
         else:
             return torch.randn(n, self.g.config.latent_dims).to(self.args.device)
 
-    def load_generator(self):
+    def load_generator(self, target=True):
         if os.path.isfile(self.args.checkpoint_root):
             g_filename = self.args.checkpoint_root
         else:
-            g_filename = f'{self.args.checkpoint_root}/g_target.pt'
+            target_slug = '_target' if target else ''
+            g_filename = f'{self.args.checkpoint_root}/g{target_slug}.pt'
         with smart_open.open(g_filename, 'rb') as infile:
             self.g = torch.load(infile, map_location=self.args.device)
+
+    def load_disciminator(self):
+        if os.path.isfile(self.args.checkpoint_root):
+            filename = self.args.checkpoint_root
+        else:
+            filename = f'{self.args.checkpoint_root}/d.pt'
+        with smart_open.open(filename, 'rb') as infile:
+            self.d = torch.load(infile, map_location=self.args.device)
 
     def save_image(self, img, filename, range=(-1, 1)):
         with smart_open.open(filename, 'wb') as output_file:
