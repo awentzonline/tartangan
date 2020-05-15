@@ -51,7 +51,11 @@ class ResidualDiscriminatorBlock(nn.Module):
                  norm_factory=nn.BatchNorm2d,
                  conv_factory=nn.Conv2d,
                  avg_pool_factory=nn.AvgPool2d,
-                 activation_factory=functools.partial(nn.LeakyReLU, 0.2)):
+                 activation_factory=functools.partial(nn.LeakyReLU, 0.2),
+                 interpolate=functools.partial(
+                    F.interpolate, scale_factor=0.5, mode='bilinear', align_corners=True
+                 ),
+                 ):
         super().__init__()
         layers = [
             norm_factory(in_dims),
@@ -73,6 +77,7 @@ class ResidualDiscriminatorBlock(nn.Module):
             self.project_input = nn.Sequential(
                 conv_factory(in_dims, out_dims, 1)
             )
+        self.interpolate = interpolate
         # map(nn.init.orthogonal_, self.parameters())
 
     def _project_input(self, x):
@@ -84,7 +89,7 @@ class ResidualDiscriminatorBlock(nn.Module):
 
     def forward(self, x):
         h = self.convs(x)
-        x = F.interpolate(x, scale_factor=0.5, mode='bilinear', align_corners=True)
+        x = self.interpolate(x)
         if self.project_input is not None:
             x = self.project_input(x)
         return x + h
@@ -121,7 +126,8 @@ class DiscriminatorPoolOnlyOutput(nn.Module):
 class DiscriminatorOutput(nn.Module):
     def __init__(self, in_dims, out_dims,
                  norm_factory=nn.BatchNorm2d,
-                 activation_factory=functools.partial(nn.LeakyReLU, 0.2)):
+                 activation_factory=functools.partial(nn.LeakyReLU, 0.2),
+                 output_activation_factory=nn.Identity):
         super().__init__()
         self.activation = nn.Sequential(
             norm_factory(in_dims),
@@ -129,11 +135,13 @@ class DiscriminatorOutput(nn.Module):
         )
         self.to_output = nn.Sequential(
             nn.Linear(in_dims, out_dims),
+            output_activation_factory(),
         )
 
     def forward(self, feats):
         feats = self.activation(feats)
-        feats = torch.sum(feats, [2, 3])  # sum pool
+        dims = list(range(2, len(feats.shape)))
+        feats = torch.sum(feats, dims)  # sum pool
         y = self.to_output(feats)
         return y
 

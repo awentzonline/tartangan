@@ -85,7 +85,7 @@ class GeneratorInputMLP1d(nn.Module):
                  activation_factory=functools.partial(nn.LeakyReLU, 0.2)):
         super().__init__()
         base_img_dims = size * output_dims
-        self.base_img = nn.Sequential(
+        self.base = nn.Sequential(
             nn.Linear(latent_dims, base_img_dims),
             activation_factory(),
         )
@@ -94,7 +94,7 @@ class GeneratorInputMLP1d(nn.Module):
         self.size = size
 
     def forward(self, z):
-        img = self.base_img(z)
+        img = self.base(z)
         return img.view(-1, self.output_dims, self.size)
 
 
@@ -115,13 +115,14 @@ class TiledZGeneratorInput(nn.Module):
 class GeneratorOutput(nn.Module):
     def __init__(self, in_dims, out_dims, norm_factory=nn.BatchNorm2d,
                  conv_factory=nn.Conv2d,
-                 activation_factory=functools.partial(nn.LeakyReLU, 0.2)):
+                 activation_factory=functools.partial(nn.LeakyReLU, 0.2),
+                 output_activation_factory=nn.Tanh):
         super().__init__()
         self.convs = nn.Sequential(
             norm_factory(in_dims),
             activation_factory(),
             conv_factory(in_dims, out_dims, 1, padding=0, bias=True),
-            nn.Tanh()
+            output_activation_factory(),
         )
 
     def forward(self, x):
