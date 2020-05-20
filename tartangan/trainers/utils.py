@@ -1,14 +1,20 @@
-import numpy as np
 import torch
 
 
 def set_device_from_args(args):
     # choose device
     if torch.cuda.is_available() and not args.no_cuda:
-        device = 'cuda'
+        if hasattr(args, 'local_rank'):
+            device = f'cuda:{args.local_rank}'
+        else:
+            device = 'cuda'
     else:
         device = 'cpu'
     setattr(args, 'device', device)
+
+
+def is_master_process():
+    return torch.distributed.get_rank() == 0
 
 
 def toggle_grad(model, on_or_off):
