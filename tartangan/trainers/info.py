@@ -26,7 +26,7 @@ from tartangan.models.pluggan import Discriminator, Generator, GAN_CONFIGS
 
 from .components.info_image_sampler import InfoImageSamplerComponent
 from .trainer import Trainer
-from .utils import set_device_from_args, toggle_grad
+from .utils import is_master_process, toggle_grad
 
 
 class InfoTrainer(Trainer):
@@ -106,7 +106,8 @@ class InfoTrainer(Trainer):
     @classmethod
     def get_component_classes(self, args):
         classes = super().get_component_classes(args)
-        classes.append(InfoImageSamplerComponent)
+        if is_master_process():
+            classes.append(InfoImageSamplerComponent)
         return classes
 
     def init_params_selu(self, params):

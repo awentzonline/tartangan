@@ -25,7 +25,7 @@ from .components.container import ComponentContainer
 from .components.model_checkpoint import ModelCheckpointComponent
 from .components.image_sampler import ImageSamplerComponent
 from .tqdm_newlines import TqdmNewLines
-from .utils import set_device_from_args
+from .utils import is_master_process, set_device_from_args
 
 
 class Trainer:
@@ -37,8 +37,9 @@ class Trainer:
         else:
             self.run_id = args.run_id
 
-        maybe_makedirs(self.output_root, exist_ok=True)
-        self._save_cli_arguments()
+        if is_master_process():
+            maybe_makedirs(self.output_root, exist_ok=True)
+            self._save_cli_arguments()
 
         self.components = ComponentContainer()
         self.components.trainer = self
@@ -217,6 +218,10 @@ class Trainer:
 
     @classmethod
     def get_component_classes(cls, args):
+        # If we're not the master process, don't log or sample anything
+        if not is_master_process():
+            return []
+
         classes = [
             ImageSamplerComponent, ModelCheckpointComponent,
         ]
@@ -311,6 +316,9 @@ class Trainer:
                        help='Explicitly set a run id. Otherwise, one will '
                        'be generated automatically.')
         p.add_argument('--fid', action='store_true', help='Calculate FID test metric')
+        p.add_argument('--local_rank', default=0, type=int,
+                       help='Rank of the process on this node')
+        p.add_argument('--node_rank', default=0, type=int, help='Rank of this node')
 
 
 if __name__ == '__main__':
