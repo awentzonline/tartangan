@@ -14,6 +14,8 @@ def set_device_from_args(args):
 
 
 def is_master_process():
+    if not torch.distributed.is_initialized():
+        return True
     return torch.distributed.get_rank() == 0
 
 
