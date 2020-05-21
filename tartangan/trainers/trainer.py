@@ -9,6 +9,7 @@ import string
 import numpy as np
 from PIL import Image
 import torch
+from torch.nn.parallel import DistributedDataParallel
 import torch.utils.data as data_utils
 from torchvision import transforms
 import tqdm
@@ -40,6 +41,7 @@ class Trainer:
         if is_master_process():
             maybe_makedirs(self.output_root, exist_ok=True)
             self._save_cli_arguments()
+            self._setup_dist()
 
         self.components = ComponentContainer()
         self.components.trainer = self
@@ -50,6 +52,14 @@ class Trainer:
 
     def build_models(self):
         pass
+
+    def _wrap_models_ddp(self):
+        if self.device == 'cpu':
+            device_ids = []
+        else:
+            device_ids = [self.args.local_rank]
+        self.g = DistributedDataParallel(self.g, device_ids=device_ids)
+        self.d = DistributedDataParallel(self.d, device_ids=device_ids)
 
     def prepare_dataset(self):
         img_size = self.g.max_size
@@ -85,6 +95,9 @@ class Trainer:
         train_loader = data_utils.DataLoader(
             self.dataset, batch_size=self.args.batch_size, shuffle=True, drop_last=True
         )
+        if self.dist_enabled:
+            self._wrap_models_ddp()
+
         logs = defaultdict(list)
         try:
             self.components.invoke('train_begin', self.steps, logs)
@@ -114,6 +127,9 @@ class Trainer:
         except KeyboardInterrupt:
             pass  # Graceful interrupt
         self.components.invoke('train_end', self.steps, logs)
+
+        if torch.distributed.is_initialized():
+            torch.distributed.destroy_process_group()
 
     def dataset_cache_path(self, size):
         # TODO: extract to component
@@ -202,6 +218,22 @@ class Trainer:
 
     def _save_cli_arguments(self):
         save_cli_arguments(f'{self.output_root}/config.args')
+
+    def _setup_dist(self):
+        if not self.dist_enabled:
+            return
+
+        rank = int(os.getenv('RANK'))
+        world_size = int(os.getenv('WORLD_SIZE'))
+        dist_backend = os.getenv('DIST_BACKEND', 'gloo')
+        print(f'init process group {dist_backend} {rank} of {world_size}')
+        torch.distributed.init_process_group(
+            dist_backend, rank=rank, world_size=world_size
+        )
+
+    @property
+    def dist_enabled(self):
+        return 'RANK' in os.environ
 
     def _generate_run_id(self, suffix_len=6):
         now = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
