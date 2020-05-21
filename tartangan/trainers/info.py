@@ -130,7 +130,7 @@ class InfoTrainer(Trainer):
         toggle_grad(self.d, True)
         self.optimizer_d.zero_grad()
         batch_imgs, labels, z = self.make_adversarial_batch(imgs)
-        real, fake = batch_imgs[:self.args.batch_size], batch_imgs[self.args.batch_size:]
+        real, fake = batch_imgs[:self.dist_batch_size], batch_imgs[self.dist_batch_size:]
         if self.args.grad_penalty:
             real.requires_grad_()
         p_labels_real, _ = self.d(real)
@@ -204,7 +204,7 @@ class InfoTrainer(Trainer):
 
     def sample_z(self, n=None):
         if n is None:
-            n = self.args.batch_size
+            n = self.dist_batch_size
         z = torch.randn(n, self.gan_config.latent_dims).to(self.device)
         # set up the categorical dimensions
         if self.args.info_cat_dims:

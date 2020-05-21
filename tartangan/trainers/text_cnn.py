@@ -192,7 +192,7 @@ class TextCNNTrainer(Trainer):
             toggle_grad(self.d, True)
             self.optimizer_d.zero_grad()
             batch_inputs, labels = self.make_adversarial_batch(inputs)
-            real, fake = batch_inputs[:self.args.batch_size], batch_inputs[self.args.batch_size:]
+            real, fake = batch_inputs[:self.dist_batch_size], batch_inputs[self.dist_batch_size:]
             if self.args.grad_penalty:
                 real.requires_grad_()
             p_labels_real = self.d(real)

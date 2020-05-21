@@ -89,18 +89,28 @@ class Trainer:
         return dataset
 
     def train(self):
+        logs = defaultdict(list)
+
         self.build_models()
         print(f'Preparing dataset from {self.args.data_path}')
         self.dataset = self.prepare_dataset()
+
+        self.components.invoke('train_begin', self.steps, logs)
+
+        if self.is_distributed:
+            sampler = data_utils.distributed.DistributedSampler(self.dataset)
+            shuffle = False
+        else:
+            sampler = None
+            shuffle = True
         train_loader = data_utils.DataLoader(
-            self.dataset, batch_size=self.args.batch_size, shuffle=True, drop_last=True
+            self.dataset, batch_size=self.dist_batch_size, shuffle=shuffle,
+            drop_last=True, sampler=sampler
         )
-        if self.dist_enabled:
+        if self.is_distributed:
             self._wrap_models_ddp()
 
-        logs = defaultdict(list)
         try:
-            self.components.invoke('train_begin', self.steps, logs)
             while self.epoch <= self.args.epochs:
                 print(f'Starting epoch {self.epoch}')
                 self.components.invoke('epoch_begin', self.steps, self.epoch, logs)
@@ -169,7 +179,7 @@ class Trainer:
 
     def sample_z(self, n=None):
         if n is None:
-            n = self.args.batch_size
+            n = self.dist_batch_size
         return torch.randn(n, self.gan_config.latent_dims).to(self.device)
 
     def sample_g(self, n=None, target_g=False, **g_kwargs):
@@ -220,11 +230,11 @@ class Trainer:
         save_cli_arguments(f'{self.output_root}/config.args')
 
     def _setup_dist(self):
-        if not self.dist_enabled:
+        if not self.is_distributed:
             return
 
         rank = int(os.getenv('RANK'))
-        world_size = int(os.getenv('WORLD_SIZE'))
+        world_size = self.dist_world_size
         dist_backend = os.getenv('DIST_BACKEND', 'gloo')
         print(f'init process group {dist_backend} {rank} of {world_size}')
         torch.distributed.init_process_group(
@@ -232,8 +242,16 @@ class Trainer:
         )
 
     @property
-    def dist_enabled(self):
+    def is_distributed(self):
         return 'RANK' in os.environ
+
+    @property
+    def dist_world_size(self):
+        return int(os.getenv('WORLD_SIZE', 1))
+
+    @property
+    def dist_batch_size(self):
+        return self.args.batch_size // self.dist_world_size
 
     def _generate_run_id(self, suffix_len=6):
         now = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')

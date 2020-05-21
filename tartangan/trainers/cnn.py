@@ -114,7 +114,7 @@ class CNNTrainer(Trainer):
         toggle_grad(self.d, True)
         self.optimizer_d.zero_grad()
         batch_imgs, labels = self.make_adversarial_batch(imgs)
-        real, fake = batch_imgs[:self.args.batch_size], batch_imgs[self.args.batch_size:]
+        real, fake = batch_imgs[:self.dist_batch_size], batch_imgs[self.dist_batch_size:]
         # torchvision.utils.save_image(real, 'batch_real.png', normalize=True, range=(-1, 1))
         # torchvision.utils.save_image(fake, 'batch_fake.png', normalize=True, range=(-1, 1))
         if self.args.grad_penalty:
