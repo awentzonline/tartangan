@@ -41,6 +41,8 @@ class ModelCheckpointComponent(TrainerComponent):
         )
         for model, filename in model_filenames:
             full_filename = f'{self.checkpoint_root}/{filename}'
+            if isinstance(model, torch.nn.parallel.DistributedDataParallel):
+                model = model.module.cpu()
             with smart_open.open(full_filename, 'wb') as outfile:
                 torch.save(model, outfile)
         # trainer state
@@ -63,7 +65,7 @@ class ModelCheckpointComponent(TrainerComponent):
         for model_name, model_filename in model_filenames:
             full_filename = f'{self.checkpoint_root}/{model_filename}'
             with smart_open.open(full_filename, 'rb') as infile:
-                cp_model = torch.load(infile)
+                cp_model = torch.load(infile, map_location='cpu')
                 model = getattr(self.trainer, model_name)
                 model.load_state_dict(cp_model.state_dict())
 
