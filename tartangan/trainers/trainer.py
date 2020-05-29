@@ -60,6 +60,8 @@ class Trainer:
             device_ids = [self.args.local_rank]
         self.g = DistributedDataParallel(self.g, device_ids=device_ids)
         self.d = DistributedDataParallel(self.d, device_ids=device_ids)
+        self.g = torch.nn.SyncBatchNorm.convert_sync_batchnorm(self.g)
+        self.d = torch.nn.SyncBatchNorm.convert_sync_batchnorm(self.d)
 
     def prepare_dataset(self):
         img_size = self.g.max_size
