@@ -24,6 +24,28 @@ class QuantileEmbedding(nn.Module):
         return self.to_state(qs)
 
 
+class CosineQuantileEmbedding(nn.Module):
+    def __init__(self, state_dims, embedding_dims=64, activation=nn.Tanh,
+                 norm_factory=nn.BatchNorm1d):
+        super().__init__()
+        self.embedding_dims = embedding_dims
+        self.to_state = nn.Sequential(
+            nn.Linear(self.embedding_dims, state_dims),
+            activation(),
+        )
+        self.register_buffer(
+            'embedding_range',
+            torch.arange(1, self.embedding_dims + 1).float()
+        )
+
+    def forward(self, quantiles):
+        batch_size = quantiles.shape[0]
+        qs = quantiles.repeat(1, self.embedding_dims)
+        qs = qs * np.pi * self.embedding_range
+        qs = torch.cos(qs)
+        return self.to_state(qs)
+
+
 class WeightedQuantileEmbedding(nn.Module):
     def __init__(self, state_dims, num_embeddings=20, use_softmax=True, **_):
         super().__init__()
@@ -54,7 +76,7 @@ class WeightedQuantileEmbedding(nn.Module):
 class IQN(nn.Module):
     def __init__(
         self, feature_dims, quantile_dims=20, num_quantiles=8, mix='mult',
-        quantile_embedding_factory=WeightedQuantileEmbedding,
+        quantile_embedding_factory=CosineQuantileEmbedding,
         norm_factory=nn.BatchNorm1d#nn.Identity#
     ):
         super().__init__()
@@ -105,4 +127,4 @@ def iqn_loss(preds, target, taus, k=1.):
         0.5 * err.pow(2),
         k * (torch.abs(err) - 0.5 * k)
     )
-    return (torch.abs(taus - (err < 0).float()) * loss).sum(-1).mean()
+    return (torch.abs(taus - (err < 0).float()) * loss).sum(0).mean()
